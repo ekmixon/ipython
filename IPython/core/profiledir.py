@@ -176,8 +176,8 @@ class ProfileDir(LoggingConfigurable):
             be "profile_<profile>".
         """
         if not os.path.isdir(path):
-            raise ProfileDirError('Directory not found: %s' % path)
-        profile_dir = os.path.join(path, u'profile_' + name)
+            raise ProfileDirError(f'Directory not found: {path}')
+        profile_dir = os.path.join(path, f'profile_{name}')
         return cls(location=profile_dir, config=config)
 
     @classmethod
@@ -199,14 +199,13 @@ class ProfileDir(LoggingConfigurable):
             The name of the profile.  The name of the profile directory
             will be "profile_<profile>".
         """
-        dirname = u'profile_' + name
+        dirname = f'profile_{name}'
         paths = [os.getcwd(), ipython_dir]
         for p in paths:
             profile_dir = os.path.join(p, dirname)
             if os.path.isdir(profile_dir):
                 return cls(location=profile_dir, config=config)
-        else:
-            raise ProfileDirError('Profile directory not found in paths: %s' % dirname)
+        raise ProfileDirError(f'Profile directory not found in paths: {dirname}')
 
     @classmethod
     def find_profile_dir(cls, profile_dir, config=None):
@@ -221,5 +220,5 @@ class ProfileDir(LoggingConfigurable):
         """
         profile_dir = expand_path(profile_dir)
         if not os.path.isdir(profile_dir):
-            raise ProfileDirError('Profile directory not found: %s' % profile_dir)
+            raise ProfileDirError(f'Profile directory not found: {profile_dir}')
         return cls(location=profile_dir, config=config)

@@ -163,12 +163,9 @@ def test_magic_parse_options():
     ip = get_ipython()
     path = 'c:\\x'
     m = DummyMagics(ip)
-    opts = m.parse_options('-f %s' % path,'f:')[0]
+    opts = m.parse_options(f'-f {path}', 'f:')[0]
     # argv splitting is os-dependent
-    if os.name == 'posix':
-        expected = 'c:x'
-    else:
-        expected = path
+    expected = 'c:x' if os.name == 'posix' else path
     assert opts["f"] == expected
 
 
@@ -268,7 +265,7 @@ def test_hist_pof():
     #raise Exception(list(ip.history_manager._get_range_session()))
     with TemporaryDirectory() as td:
         tf = os.path.join(td, 'hist.py')
-        ip.run_line_magic('history', '-pof %s' % tf)
+        ip.run_line_magic('history', f'-pof {tf}')
         assert os.path.isfile(tf)
 
 
@@ -345,7 +342,7 @@ def test_reset_in():
 def test_reset_dhist():
     "Test '%reset dhist' magic"
     _ip.run_cell("tmp = [d for d in _dh]")  # copy before clearing
-    _ip.magic("cd " + os.path.dirname(pytest.__file__))
+    _ip.magic(f"cd {os.path.dirname(pytest.__file__)}")
     _ip.magic("cd -")
     assert len(_ip.user_ns["_dh"]) > 0
     _ip.magic("reset -f dhist")
@@ -540,7 +537,7 @@ def test_cd_force_quiet():
 def test_xmode():
     # Calling xmode three times should be a no-op
     xmode = _ip.InteractiveTB.mode
-    for i in range(4):
+    for _ in range(4):
         _ip.magic("xmode")
     assert _ip.InteractiveTB.mode == xmode
 
@@ -555,7 +552,7 @@ def test_reset_hard():
     _ip.user_ns["a"] = A()
     _ip.run_cell("a")
 
-    assert monitor == []
+    assert not monitor
     _ip.magic("reset -f")
     assert monitor == [1]
 
@@ -569,7 +566,7 @@ class TestXdel(tt.TempFileMixin):
                "a = A()\n")
         self.mktmp(src)
         # %run creates some hidden references...
-        _ip.magic("run %s" % self.fname)
+        _ip.magic(f"run {self.fname}")
         # ... as does the displayhook.
         _ip.run_cell("a")
 
@@ -752,7 +749,7 @@ def test_notebook_export_json():
         _ip.history_manager.store_inputs(i, cmd)
     with TemporaryDirectory() as td:
         outfile = os.path.join(td, "nb.ipynb")
-        _ip.magic("notebook -e %s" % outfile)
+        _ip.magic(f"notebook -e {outfile}")
 
 
 class TestEnv(TestCase):
@@ -811,7 +808,7 @@ class CellMagicTestCase(TestCase):
         out = _ip.run_cell_magic(magic, "a", "b")
         assert out == ("a", "b")
         # Via run_cell, it goes into the user's namespace via displayhook
-        _ip.run_cell("%%" + magic + " c\nd\n")
+        _ip.run_cell(f"%%{magic}" + " c\nd\n")
         assert _ip.user_ns["_"] == ("c", "d\n")
 
     def test_cell_magic_func_deco(self):
@@ -855,7 +852,7 @@ class CellMagicTestCase(TestCase):
         self.check_ident('cellm4')
         # Check that nothing is registered as 'cellm33'
         c33 = _ip.find_cell_magic('cellm33')
-        assert c33 == None
+        assert c33 is None
 
 def test_file():
     """Basic %%writefile"""
@@ -940,10 +937,17 @@ def test_file_amend():
             'line1',
             'line2',
         ]))
-        ip.run_cell_magic("writefile", "-a %s" % fname, u'\n'.join([
-            'line3',
-            'line4',
-        ]))
+        ip.run_cell_magic(
+            "writefile",
+            f"-a {fname}",
+            u'\n'.join(
+                [
+                    'line3',
+                    'line4',
+                ]
+            ),
+        )
+
         s = Path(fname).read_text()
         assert "line1\n" in s
         assert "line3\n" in s
@@ -1142,11 +1146,11 @@ def test_save():
         ip.history_manager.store_inputs(i, cmd)
     with TemporaryDirectory() as tmpdir:
         file = os.path.join(tmpdir, "testsave.py")
-        ip.run_line_magic("save", "%s 1-10" % file)
+        ip.run_line_magic("save", f"{file} 1-10")
         content = Path(file).read_text()
         assert content.count(cmds[0]) == 1
         assert "coding: utf-8" in content
-        ip.run_line_magic("save", "-a %s 1-10" % file)
+        ip.run_line_magic("save", f"-a {file} 1-10")
         content = Path(file).read_text()
         assert content.count(cmds[0]) == 2
         assert "coding: utf-8" in content
@@ -1277,8 +1281,7 @@ def test_logging_magic_quiet_from_arg():
     with TemporaryDirectory() as td:
         try:
             with tt.AssertNotPrints(re.compile("Activating.*")):
-                lm.logstart('-q {}'.format(
-                        os.path.join(td, "quiet_from_arg.log")))
+                lm.logstart(f'-q {os.path.join(td, "quiet_from_arg.log")}')
         finally:
             _ip.logger.logstop()
 
@@ -1335,14 +1338,14 @@ def test_run_module_from_import_hook():
         fullpath = os.path.join(tmpdir, 'my_tmp.py')
         Path(fullpath).write_text(TEST_MODULE)
 
+
+
         class MyTempImporter(object):
             def __init__(self):
                 pass
 
             def find_module(self, fullname, path=None):
-                if 'my_tmp' in fullname:
-                    return self
-                return None
+                return self if 'my_tmp' in fullname else None
 
             def load_module(self, name):
                 import imp
@@ -1353,6 +1356,7 @@ def test_run_module_from_import_hook():
 
             def is_package(self, __):
                 return False
+
 
         sys.meta_path.insert(0, MyTempImporter())
 

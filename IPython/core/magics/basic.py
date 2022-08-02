@@ -19,7 +19,7 @@ from IPython.utils.ipstruct import Struct
 
 class MagicsDisplay(object):
     def __init__(self, magics_manager, ignore=None):
-        self.ignore = ignore if ignore else []
+        self.ignore = ignore or []
         self.magics_manager = magics_manager
     
     def _lsmagic(self):
@@ -28,13 +28,34 @@ class MagicsDisplay(object):
         cesc = magic_escapes['cell']
         mman = self.magics_manager
         magics = mman.lsmagic()
-        out = ['Available line magics:',
-               mesc + ('  '+mesc).join(sorted([m for m,v in magics['line'].items() if (v not in self.ignore)])),
-               '',
-               'Available cell magics:',
-               cesc + ('  '+cesc).join(sorted([m for m,v in magics['cell'].items() if (v not in self.ignore)])),
-               '',
-               mman.auto_status()]
+        out = [
+            'Available line magics:',
+            mesc
+            + f'  {mesc}'.join(
+                sorted(
+                    [
+                        m
+                        for m, v in magics['line'].items()
+                        if (v not in self.ignore)
+                    ]
+                )
+            ),
+            '',
+            'Available cell magics:',
+            cesc
+            + f'  {cesc}'.join(
+                sorted(
+                    [
+                        m
+                        for m, v in magics['cell'].items()
+                        if (v not in self.ignore)
+                    ]
+                )
+            ),
+            '',
+            mman.auto_status(),
+        ]
+
         return '\n'.join(out)
 
     def _repr_pretty_(self, p, cycle):
@@ -59,7 +80,7 @@ class MagicsDisplay(object):
                     classname = obj.__self__.__class__.__name__
                 except AttributeError:
                     classname = 'Other'
-                
+
                 d[name] = classname
         return magic_dict
         
@@ -145,35 +166,38 @@ class BasicMagics(Magics):
         m_line = shell.find_magic(target, 'line')
         m_cell = shell.find_magic(target, 'cell')
         if args.line and m_line is None:
-            raise UsageError('Line magic function `%s%s` not found.' %
-                             (magic_escapes['line'], target))
+            raise UsageError(
+                f"Line magic function `{magic_escapes['line']}{target}` not found."
+            )
+
         if args.cell and m_cell is None:
-            raise UsageError('Cell magic function `%s%s` not found.' %
-                             (magic_escapes['cell'], target))
+            raise UsageError(
+                f"Cell magic function `{magic_escapes['cell']}{target}` not found."
+            )
+
 
         # If --line and --cell are not specified, default to the ones
         # that are available.
         if not args.line and not args.cell:
             if not m_line and not m_cell:
-                raise UsageError(
-                    'No line or cell magic with name `%s` found.' % target
-                )
+                raise UsageError(f'No line or cell magic with name `{target}` found.')
             args.line = bool(m_line)
             args.cell = bool(m_cell)
 
-        params_str = "" if params is None else " " + params
+        params_str = "" if params is None else f" {params}"
 
         if args.line:
             mman.register_alias(name, target, 'line', params)
-            print('Created `%s%s` as an alias for `%s%s%s`.' % (
-                magic_escapes['line'], name,
-                magic_escapes['line'], target, params_str))
+            print(
+                f"Created `{magic_escapes['line']}{name}` as an alias for `{magic_escapes['line']}{target}{params_str}`."
+            )
+
 
         if args.cell:
             mman.register_alias(name, target, 'cell', params)
-            print('Created `%s%s` as an alias for `%s%s%s`.' % (
-                magic_escapes['cell'], name,
-                magic_escapes['cell'], target, params_str))
+            print(
+                f"Created `{magic_escapes['cell']}{name}` as an alias for `{magic_escapes['cell']}{target}{params_str}`."
+            )
 
     @line_magic
     def lsmagic(self, parameter_s=''):
@@ -185,11 +209,7 @@ class BasicMagics(Magics):
         mman = self.shell.magics_manager
         docs = mman.lsmagic_docs(brief, missing='No documentation')
 
-        if rest:
-            format_string = '**%s%s**::\n\n%s\n\n'
-        else:
-            format_string = '%s%s:\n%s\n'
-
+        format_string = '**%s%s**::\n\n%s\n\n' if rest else '%s%s:\n%s\n'
         return ''.join(
             [format_string % (magic_escapes['line'], fname,
                               indent(dedent(fndoc)))
@@ -223,7 +243,8 @@ class BasicMagics(Magics):
         else:
             magic_docs = format_screen(magic_docs)
 
-        out = ["""
+        out = [
+            """
 IPython's 'magic' functions
 ===========================
 
@@ -268,10 +289,11 @@ For a list of the available magic functions, use %lsmagic. For a description
 of any of them, type %magic_name?, e.g. '%cd?'.
 
 Currently the magic system has the following functions:""",
-       magic_docs,
-       "Summary of magic functions (from %slsmagic):" % magic_escapes['line'],
-       str(self.lsmagic()),
-       ]
+            magic_docs,
+            f"Summary of magic functions (from {magic_escapes['line']}lsmagic):",
+            str(self.lsmagic()),
+        ]
+
         page.page('\n'.join(out))
 
 
@@ -299,7 +321,7 @@ Currently the magic system has the following functions:""",
             txt = (raw and str or pformat)( info['obj'] )
             page.page(txt)
         else:
-            print('Object `%s` not found' % oname)
+            print(f'Object `{oname}` not found')
 
     @line_magic
     def pprint(self, parameter_s=''):
@@ -465,14 +487,14 @@ Currently the magic system has the following functions:""",
             ptformatter.pprint = dstore.rc_pprint
             disp_formatter.active_types = dstore.rc_active_types
 
-            shell.magic('xmode ' + dstore.xmode)
+            shell.magic(f'xmode {dstore.xmode}')
 
         # mode here is the state before we switch; switch_doctest_mode takes
         # the mode we're switching to.
         shell.switch_doctest_mode(not mode)
 
         # Store new mode and inform
-        dstore.mode = bool(not mode)
+        dstore.mode = not mode
         mode_label = ['OFF','ON'][dstore.mode]
         print('Doctest mode is:', mode_label)
 
@@ -581,15 +603,14 @@ Currently the magic system has the following functions:""",
 
         from nbformat import write, v4
 
-        cells = []
         hist = list(self.shell.history_manager.get_range())
         if(len(hist)<=1):
             raise ValueError('History is empty, cannot export')
-        for session, execution_count, source in hist[:-1]:
-            cells.append(v4.new_code_cell(
-                execution_count=execution_count,
-                source=source
-            ))
+        cells = [
+            v4.new_code_cell(execution_count=execution_count, source=source)
+            for session, execution_count, source in hist[:-1]
+        ]
+
         nb = v4.new_notebook(cells=cells)
         with io.open(args.filename, 'w', encoding='utf-8') as f:
             write(nb, f, version=4)
@@ -633,13 +654,13 @@ class AsyncMagics(BasicMagics):
         """
 
         param = parameter_s.strip()
-        d = {True: "on", False: "off"}
-
         if not param:
-            print("IPython autoawait is `{}`, and set to use `{}`".format(
-                d[self.shell.autoawait],
-                self.shell.loop_runner
-            ))
+            d = {True: "on", False: "off"}
+
+            print(
+                f"IPython autoawait is `{d[self.shell.autoawait]}`, and set to use `{self.shell.loop_runner}`"
+            )
+
             return None
 
         if param.lower() in ('false', 'off'):

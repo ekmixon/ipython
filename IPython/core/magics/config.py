@@ -108,9 +108,15 @@ class ConfigMagics(Magics):
         # some IPython objects are Configurable, but do not yet have
         # any configurable traits.  Exclude them from the effects of
         # this magic, as their presence is just noise:
-        configurables = sorted(set([ c for c in self.shell.configurables
-                                     if c.__class__.class_traits(config=True)
-                                     ]), key=lambda x: x.__class__.__name__)
+        configurables = sorted(
+            {
+                c
+                for c in self.shell.configurables
+                if c.__class__.class_traits(config=True)
+            },
+            key=lambda x: x.__class__.__name__,
+        )
+
         classnames = [ c.__class__.__name__ for c in configurables ]
 
         line = s.strip()
@@ -135,8 +141,8 @@ class ConfigMagics(Magics):
             return getattr(configurables[classnames.index(cls)],attr)
         elif '=' not in line:
             msg = "Invalid config statement: %r, "\
-                  "should be `Class.trait = value`."
-            
+                      "should be `Class.trait = value`."
+
             ll = line.lower()
             for classname in classnames:
                 if ll == classname.lower():
@@ -149,7 +155,7 @@ class ConfigMagics(Magics):
         # leave quotes on args when splitting, because we want
         # unquoted args to eval in user_ns
         cfg = Config()
-        exec("cfg."+line, self.shell.user_ns, locals())
+        exec(f"cfg.{line}", self.shell.user_ns, locals())
 
         for configurable in configurables:
             try:

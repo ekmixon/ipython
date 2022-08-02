@@ -60,7 +60,7 @@ class PdbTestInput(object):
 
 def test_longer_repr():
     from reprlib import repr as trepr
-    
+
     a = '1234567890'* 7
     ar = "'1234567890123456789012345678901234567890123456789012345678901234567890'"
     a_trunc = "'123456789012...8901234567890'"
@@ -398,10 +398,8 @@ def _decorator_skip_setup():
     child.expect("\n")
 
     dedented_blocks = [dedent(b).strip() for b in skip_decorators_blocks]
-    in_prompt_number = 1
-    for cblock in dedented_blocks:
+    for in_prompt_number, cblock in enumerate(dedented_blocks, start=1):
         child.expect_exact(f"In [{in_prompt_number}]:")
-        in_prompt_number += 1
         for line in cblock.splitlines():
             child.sendline(line)
             child.expect_exact(line)
@@ -487,10 +485,8 @@ def test_decorator_skip_with_breakpoint():
             "f()",
         ]
 
-        in_prompt_number = 1
-        for cblock in dedented_blocks:
+        for in_prompt_number, cblock in enumerate(dedented_blocks, start=1):
             child.expect_exact(f"In [{in_prompt_number}]:")
-            in_prompt_number += 1
             for line in cblock.splitlines():
                 child.sendline(line)
                 child.expect_exact(line)

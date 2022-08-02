@@ -87,6 +87,7 @@ def test_embed_svg_url():
     gzip_svg = gzip_svg.getvalue()
 
     def mocked_urlopen(*args, **kwargs):
+
         class MockResponse:
             def __init__(self, svg):
                 self._svg_data = svg
@@ -97,7 +98,7 @@ def test_embed_svg_url():
 
         if args[0] == url:
             return MockResponse(svg_data)
-        elif args[0] == url + "z":
+        elif args[0] == f"{url}z":
             ret = MockResponse(gzip_svg)
             ret.headers["content-encoding"] = "gzip"
             return ret
@@ -106,7 +107,7 @@ def test_embed_svg_url():
     with mock.patch('urllib.request.urlopen', side_effect=mocked_urlopen):
         svg = display.SVG(url=url)
         assert svg._repr_svg_().startswith("<svg") is True
-        svg = display.SVG(url=url + "z")
+        svg = display.SVG(url=f"{url}z")
         assert svg._repr_svg_().startswith("<svg") is True
 
 
@@ -208,7 +209,7 @@ def test_set_matplotlib_formats_kwargs():
     expected = kwargs
     expected["base64"] = True
     expected["fmt"] = "png"
-    expected.update(cfg.print_figure_kwargs)
+    expected |= cfg.print_figure_kwargs
     assert formatter_kwargs == expected
 
 def test_display_available():

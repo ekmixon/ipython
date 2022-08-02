@@ -43,15 +43,11 @@ class NamespaceMagics(Magics):
 
         '%pinfo object' is just a synonym for object? or ?object."""
 
-        #print 'pinfo par: <%s>' % parameter_s  # dbg
-        # detail_level: 0 -> obj? , 1 -> obj??
-        detail_level = 0
         # We need to detect if we got called as 'pinfo pinfo foo', which can
         # happen if the user types 'pinfo foo?' at the cmd line.
         pinfo,qmark1,oname,qmark2 = \
-               re.match(r'(pinfo )?(\?*)(.*?)(\??$)',parameter_s).groups()
-        if pinfo or qmark1 or qmark2:
-            detail_level = 1
+                   re.match(r'(pinfo )?(\?*)(.*?)(\??$)',parameter_s).groups()
+        detail_level = 1 if pinfo or qmark1 or qmark2 else 0
         if "*" in oname:
             self.psearch(oname)
         else:
@@ -216,12 +212,8 @@ class NamespaceMagics(Magics):
         opt = opts.get
         shell = self.shell
         psearch = shell.inspector.psearch
-        
-        # select list object types
-        list_types = False
-        if 'l' in opts:
-            list_types = True
 
+        list_types = 'l' in opts
         # select case options
         if 'i' in opts:
             ignore_case = True
@@ -274,10 +266,9 @@ class NamespaceMagics(Magics):
         nonmatching = object()  # This can never be in user_ns
         out = [ i for i in user_ns
                 if not i.startswith('_') \
-                and (user_ns[i] is not user_ns_hidden.get(i, nonmatching)) ]
+                    and (user_ns[i] is not user_ns_hidden.get(i, nonmatching)) ]
 
-        typelist = parameter_s.split()
-        if typelist:
+        if typelist := parameter_s.split():
             typeset = set(typelist)
             out = [i for i in out if type(user_ns[i]).__name__ in typeset]
 
@@ -437,14 +428,14 @@ class NamespaceMagics(Magics):
         typewidth = max(max(map(len,typelist)), len(typelabel)) + colsep
         # table header
         print(varlabel.ljust(varwidth) + typelabel.ljust(typewidth) + \
-              ' '+datalabel+'\n' + '-'*(varwidth+typewidth+len(datalabel)+1))
+                  ' '+datalabel+'\n' + '-'*(varwidth+typewidth+len(datalabel)+1))
         # and the table itself
         kb = 1024
         Mb = 1048576  # kb**2
         for vname,var,vtype in zip(varnames,varlist,typelist):
             print(vformat.format(vname, vtype, varwidth=varwidth, typewidth=typewidth), end=' ')
             if vtype in seq_types:
-                print("n="+str(len(var)))
+                print(f"n={len(var)}")
             elif vtype == ndarray_type:
                 vshape = str(var.shape).replace(',','').replace(' ','x')[1:-1]
                 if vtype==ndarray_type:
@@ -458,9 +449,9 @@ class NamespaceMagics(Magics):
                 else:
                     print(aformat % (vshape, vsize, vdtype, vbytes), end=' ')
                     if vbytes < Mb:
-                        print('(%s kb)' % (vbytes/kb,))
+                        print(f'({vbytes / kb} kb)')
                     else:
-                        print('(%s Mb)' % (vbytes/Mb,))
+                        print(f'({vbytes / Mb} Mb)')
             else:
                 try:
                     vstr = str(var)
@@ -473,7 +464,7 @@ class NamespaceMagics(Magics):
                 if len(vstr) < 50:
                     print(vstr)
                 else:
-                    print(vstr[:25] + "<...>" + vstr[-25:])
+                    print(f"{vstr[:25]}<...>{vstr[-25:]}")
 
     @line_magic
     def reset(self, parameter_s=''):
@@ -572,7 +563,7 @@ class NamespaceMagics(Magics):
                 print("Flushing input history")
                 pc = self.shell.displayhook.prompt_count + 1
                 for n in range(1, pc):
-                    key = '_i'+repr(n)
+                    key = f'_i{repr(n)}'
                     user_ns.pop(key,None)
                 user_ns.update(dict(_i=u'',_ii=u'',_iii=u''))
                 hm = ip.history_manager
@@ -601,7 +592,7 @@ class NamespaceMagics(Magics):
 
             else:
                 print("Don't know how to reset ", end=' ')
-                print(target + ", please run `%reset?` for details")
+                print(f"{target}, please run `%reset?` for details")
 
         gc.collect()
 
@@ -709,4 +700,4 @@ class NamespaceMagics(Magics):
         try:
             self.shell.del_var(varname, ('n' in opts))
         except (NameError, ValueError) as e:
-            print(type(e).__name__ +": "+ str(e))
+            print(f"{type(e).__name__}: {str(e)}")

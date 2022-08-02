@@ -149,7 +149,7 @@ class TokenInputTransformer(InputTransformer):
             # Multi-line statement - stop and try again with the next line
             self.reset_tokenizer()
             return None
-        
+
         return self.output(tokens)
     
     def output(self, tokens):
@@ -223,10 +223,11 @@ def _tr_system2(line_info):
 def _tr_help(line_info):
     "Translate lines escaped with: ?/??"
     # A naked help line should just fire the intro help screen
-    if not line_info.line[1:]:
-        return 'get_ipython().show_usage()'
-
-    return _make_help_call(line_info.ifun, line_info.esc, line_info.pre)
+    return (
+        _make_help_call(line_info.ifun, line_info.esc, line_info.pre)
+        if line_info.line[1:]
+        else 'get_ipython().show_usage()'
+    )
 
 def _tr_magic(line_info):
     "Translate lines escaped with: %"
@@ -251,8 +252,7 @@ def _tr_quote2(line_info):
 
 def _tr_paren(line_info):
     "Translate lines escaped with: /"
-    return '%s%s(%s)' % (line_info.pre, line_info.ifun,
-                         ", ".join(line_info.the_rest.split()))
+    return f'{line_info.pre}{line_info.ifun}({", ".join(line_info.the_rest.split())})'
 
 tr = { ESC_SHELL  : _tr_system,
        ESC_SH_CAP : _tr_system2,
@@ -270,10 +270,7 @@ def escaped_commands(line):
     if not line or line.isspace():
         return line
     lineinf = LineInfo(line)
-    if lineinf.esc not in tr:
-        return line
-    
-    return tr[lineinf.esc](lineinf)
+    return line if lineinf.esc not in tr else tr[lineinf.esc](lineinf)
 
 _initial_space_re = re.compile(r'\s*')
 
@@ -370,17 +367,17 @@ def cellmagic(end_on_blank_line=False):
         # consume leading empty lines
         while not line:
             line = (yield line)
-        
+
         if not line.startswith(ESC_MAGIC2):
             # This isn't a cell magic, idle waiting for reset then start over
             while line is not None:
                 line = (yield line)
             continue
-        
+
         if cellmagic_help_re.match(line):
             # This case will be handled by help_end
             continue
-        
+
         first = line
         body = []
         line = (yield None)
@@ -388,7 +385,7 @@ def cellmagic(end_on_blank_line=False):
                                 ((line.strip() != '') or not end_on_blank_line):
             body.append(line)
             line = (yield None)
-        
+
         # Output
         magic_name, _, first = first.partition(' ')
         magic_name = magic_name.lstrip(ESC_MAGIC2)
@@ -418,21 +415,20 @@ def _strip_prompts(prompt_re, initial_re=None, turnoff_re=None):
     line = ''
     while True:
         line = (yield line)
-        
+
         # First line of cell
         if line is None:
             continue
         out, n1 = initial_re.subn('', line, count=1)
-        if turnoff_re and not n1:
-            if turnoff_re.match(line):
-                # We're in e.g. a cell magic; disable this transformer for
-                # the rest of the cell.
-                while line is not None:
-                    line = (yield line)
-                continue
+        if turnoff_re and not n1 and turnoff_re.match(line):
+            # We're in e.g. a cell magic; disable this transformer for
+            # the rest of the cell.
+            while line is not None:
+                line = (yield line)
+            continue
 
         line = (yield out)
-        
+
         if line is None:
             continue
         # check for any prompt on the second line of the cell,
@@ -440,13 +436,13 @@ def _strip_prompts(prompt_re, initial_re=None, turnoff_re=None):
         # so we might not see it in the first line.
         out, n2 = prompt_re.subn('', line, count=1)
         line = (yield out)
-        
+
         if n1 or n2:
             # Found a prompt in the first two lines - check for it in
             # the rest of the cell as well.
             while line is not None:
                 line = (yield prompt_re.sub('', line, count=1))
-        
+
         else:
             # Prompts not in input - wait for reset
             while line is not None:
@@ -483,13 +479,12 @@ def leading_indent():
     line = ''
     while True:
         line = (yield line)
-        
+
         if line is None:
             continue
-        
-        m = space_re.match(line)
-        if m:
-            space = m.group(0)
+
+        if m := space_re.match(line):
+            space = m[0]
             while line is not None:
                 if line.startswith(space):
                     line = line[len(space):]
@@ -516,12 +511,9 @@ assign_system_template = '%s = get_ipython().getoutput(%r)'
 def assign_from_system(line):
     """Transform assignment from system commands (e.g. files = !ls)"""
     m = assign_system_re.match(line)
-    if m is None:
-        return line
-    
-    return assign_system_template % m.group('lhs', 'cmd')
+    return line if m is None else assign_system_template % m.group('lhs', 'cmd')
 
-assign_magic_re = re.compile(r'{}%\s*(?P<cmd>.*)'.format(_assign_pat), re.VERBOSE)
+assign_magic_re = re.compile(f'{_assign_pat}%\s*(?P<cmd>.*)', re.VERBOSE)
 assign_magic_template = '%s = get_ipython().run_line_magic(%r, %r)'
 @StatelessInputTransformer.wrap
 def assign_from_magic(line):

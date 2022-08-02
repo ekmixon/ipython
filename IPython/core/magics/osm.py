@@ -68,10 +68,7 @@ class OSMagics(Magics):
         """
             Test for executable on a POSIX system
         """
-        if os.access(file.path, os.X_OK):
-            # will fail on maxOS if access is not X_OK
-            return file.is_file()
-        return False
+        return file.is_file() if os.access(file.path, os.X_OK) else False
 
 
     
@@ -87,10 +84,7 @@ class OSMagics(Magics):
         """
             Test for executable file on non POSIX system
         """
-        if self.is_posix:
-            return self._isexec_POSIX(file)
-        else:
-            return self._isexec_WIN(file)
+        return self._isexec_POSIX(file) if self.is_posix else self._isexec_WIN(file)
 
 
     @skip_doctest
@@ -263,17 +257,20 @@ class OSMagics(Magics):
                     for ff in dirlist:
                         fname = ff.name
                         base, ext = os.path.splitext(fname)
-                        if self.isexec(ff) and base.lower() not in no_alias:
-                            if ext.lower() == '.exe':
-                                fname = base
-                                try:
-                                    # Removes dots from the name since ipython
-                                    # will assume names with dots to be python.
-                                    self.shell.alias_manager.define_alias(
-                                        base.lower().replace('.',''), fname)
-                                except InvalidAliasError:
-                                    pass
-                                syscmdlist.append(fname)
+                        if (
+                            self.isexec(ff)
+                            and base.lower() not in no_alias
+                            and ext.lower() == '.exe'
+                        ):
+                            fname = base
+                            try:
+                                # Removes dots from the name since ipython
+                                # will assume names with dots to be python.
+                                self.shell.alias_manager.define_alias(
+                                    base.lower().replace('.',''), fname)
+                            except InvalidAliasError:
+                                pass
+                            syscmdlist.append(fname)
 
             self.shell.db['syscmdlist'] = syscmdlist
         finally:
@@ -347,10 +344,8 @@ class OSMagics(Magics):
             # Happens if the CWD has been deleted.
             oldcwd = None
 
-        numcd = re.match(r'(-)(\d+)$',parameter_s)
-        # jump in directory history by number
-        if numcd:
-            nn = int(numcd.group(2))
+        if numcd := re.match(r'(-)(\d+)$', parameter_s):
+            nn = int(numcd[2])
             try:
                 ps = self.shell.user_ns['_dh'][nn]
             except IndexError:
@@ -391,14 +386,13 @@ class OSMagics(Magics):
                 ps = self.shell.user_ns['_dh'][-2]
             except IndexError as e:
                 raise UsageError('%cd -: No previous directory to change to.') from e
-        # jump to bookmark if needed
         else:
             if not os.path.isdir(ps) or 'b' in opts:
                 bkms = self.shell.db.get('bookmarks', {})
 
                 if ps in bkms:
                     target = bkms[ps]
-                    print('(bookmark:%s) -> %s' % (ps, target))
+                    print(f'(bookmark:{ps}) -> {target}')
                     ps = target
                 else:
                     if 'b' in opts:
@@ -452,9 +446,8 @@ class OSMagics(Magics):
                 key = parameter_s.strip()
                 if key in os.environ:
                     return os.environ[key]
-                else:
-                    err = "Environment does not have key: {0}".format(key)
-                    raise UsageError(err)
+                err = "Environment does not have key: {0}".format(key)
+                raise UsageError(err)
             if len(bits) > 1:
                 return self.set_env(parameter_s)
         env = dict(os.environ)
@@ -722,18 +715,16 @@ class OSMagics(Magics):
 
         This is very useful when trying to use such lists as arguments to
         system commands."""
-        
+
         if cell is None:
             # line magic
             return self.shell.getoutput(line)
+        opts,args = self.parse_options(line, '', 'out=')
+        output = self.shell.getoutput(cell)
+        if out_name := opts.get('out', opts.get('o')):
+            self.shell.user_ns[out_name] = output
         else:
-            opts,args = self.parse_options(line, '', 'out=')
-            output = self.shell.getoutput(cell)
-            out_name = opts.get('out', opts.get('o'))
-            if out_name:
-                self.shell.user_ns[out_name] = output
-            else:
-                return output
+            return output
 
     system = line_cell_magic('system')(sx)
     bang = cell_magic('!')(sx)
@@ -781,21 +772,17 @@ class OSMagics(Magics):
             bkms = {}
         elif 'l' in opts:
             bks = sorted(bkms)
-            if bks:
-                size = max(map(len, bks))
-            else:
-                size = 0
-            fmt = '%-'+str(size)+'s -> %s'
+            size = max(map(len, bks)) if bks else 0
+            fmt = f'%-{str(size)}s -> %s'
             print('Current bookmarks:')
             for bk in bks:
                 print(fmt % (bk, bkms[bk]))
-        else:
-            if not args:
-                raise UsageError("%bookmark: You must specify the bookmark name")
-            elif len(args)==1:
-                bkms[args[0]] = os.getcwd()
-            elif len(args)==2:
-                bkms[args[0]] = args[1]
+        elif not args:
+            raise UsageError("%bookmark: You must specify the bookmark name")
+        elif len(args)==1:
+            bkms[args[0]] = os.getcwd()
+        elif len(args)==2:
+            bkms[args[0]] = args[1]
         self.shell.db['bookmarks'] = bkms
 
     @line_magic
@@ -845,15 +832,15 @@ class OSMagics(Magics):
             filename = os.path.expanduser(args.filename[1:-1])
         else:
             filename = os.path.expanduser(args.filename)
-            
+
         if os.path.exists(filename):
             if args.append:
-                print("Appending to %s" % filename)
+                print(f"Appending to {filename}")
             else:
-                print("Overwriting %s" % filename)
+                print(f"Overwriting {filename}")
         else:
-            print("Writing %s" % filename)
-        
+            print(f"Writing {filename}")
+
         mode = 'a' if args.append else 'w'
         with io.open(filename, mode, encoding='utf-8') as f:
             f.write(cell)

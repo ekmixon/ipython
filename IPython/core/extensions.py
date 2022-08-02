@@ -77,7 +77,7 @@ class ExtensionManager(Configurable):
         except ModuleNotFoundError:
             if module_str in BUILTINS_EXTS:
                 BUILTINS_EXTS[module_str] = True
-                return self._load_extension("IPython.extensions." + module_str)
+                return self._load_extension(f"IPython.extensions.{module_str}")
             raise
 
     def _load_extension(self, module_str: str):
@@ -112,7 +112,7 @@ class ExtensionManager(Configurable):
         otherwise None.
         """
         if BUILTINS_EXTS.get(module_str, False) is True:
-            module_str = "IPython.extensions." + module_str
+            module_str = f"IPython.extensions.{module_str}"
         if module_str not in self.loaded:
             return "not loaded"
 
@@ -134,7 +134,7 @@ class ExtensionManager(Configurable):
         from IPython.utils.syspathcontext import prepended_to_syspath
 
         if BUILTINS_EXTS.get(module_str, False) is True:
-            module_str = "IPython.extensions." + module_str
+            module_str = f"IPython.extensions.{module_str}"
 
         if (module_str in self.loaded) and (module_str in sys.modules):
             self.unload_extension(module_str)

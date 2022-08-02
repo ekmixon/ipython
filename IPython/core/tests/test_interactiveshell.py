@@ -91,12 +91,10 @@ class InteractiveShellTestCase(unittest.TestCase):
             newlen = len(ip.user_ns['Out'])
             self.assertEqual(oldlen, newlen)
             self.assertIsNone(res.result)
-        i = 0
         #also test the default caching behavior
-        for cell in ['1', '1;1']:
+        for i, cell in enumerate(['1', '1;1'], start=1):
             ip.run_cell(cell, store_history=True)
             newlen = len(ip.user_ns['Out'])
-            i += 1
             self.assertEqual(oldlen+i, newlen)
 
     def test_syntax_error(self):
@@ -485,7 +483,7 @@ class InteractiveShellTestCase(unittest.TestCase):
     def test_new_main_mod(self):
         # Smoketest to check that this accepts a unicode module name
         name = u'jiefmw'
-        mod = ip.new_main_mod(u'%s.py' % name, name)
+        mod = ip.new_main_mod(f'{name}.py', name)
         self.assertEqual(mod.__name__, name)
 
     def test_get_exception_only(self):
@@ -524,7 +522,7 @@ class InteractiveShellTestCase(unittest.TestCase):
 
         ip.reset()
         for cmd in ('clear', 'more', 'less', 'man'):
-            res = ip.run_cell('%' + cmd)
+            res = ip.run_cell(f'%{cmd}')
             self.assertEqual(res.success, True)
 
 
@@ -569,7 +567,7 @@ class ExitCodeChecks(tt.TempFileMixin):
         self.mktmp("import signal, time\n"
                    "signal.setitimer(signal.ITIMER_REAL, 0.1)\n"
                    "time.sleep(1)\n")
-        self.system("%s %s" % (sys.executable, self.fname))
+        self.system(f"{sys.executable} {self.fname}")
         self.assertEqual(ip.user_ns['_exit_code'], -signal.SIGALRM)
     
     @onlyif_cmds_exist("csh")
@@ -656,9 +654,7 @@ class Negator(ast.NodeTransformer):
 
     # for python 3.8+
     def visit_Constant(self, node):
-        if isinstance(node.value, int):
-            return self.visit_Num(node)
-        return node
+        return self.visit_Num(node) if isinstance(node.value, int) else node
 
 class TestAstTransform(unittest.TestCase):
     def setUp(self):
@@ -757,9 +753,7 @@ class IntegerWrapper(ast.NodeTransformer):
 
     # For Python 3.8+
     def visit_Constant(self, node):
-        if isinstance(node.value, int):
-            return self.visit_Num(node)
-        return node
+        return self.visit_Num(node) if isinstance(node.value, int) else node
 
 
 class TestAstTransform2(unittest.TestCase):
@@ -809,9 +803,7 @@ class ErrorTransformer(ast.NodeTransformer):
 
     # for Python 3.8+
     def visit_Constant(self, node):
-        if isinstance(node.value, int):
-            return self.visit_Num(node)
-        return node
+        return self.visit_Num(node) if isinstance(node.value, int) else node
 
 
 class TestAstTransformError(unittest.TestCase):
@@ -1020,7 +1012,7 @@ def wrn():
         """
         No deprecation warning should be raised from imported functions
         """
-        ip.run_cell("from {} import wrn".format(self.fname))
+        ip.run_cell(f"from {self.fname} import wrn")
 
         with tt.AssertNotPrints("I AM  A WARNING"):
             ip.run_cell("wrn()")

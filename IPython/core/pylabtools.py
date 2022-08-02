@@ -90,7 +90,7 @@ def getfigs(*fig_nums):
         for num in fig_nums:
             f = Gcf.figs.get(num)
             if f is None:
-                print('Warning: figure %s not available.' % num)
+                print(f'Warning: figure {num} not available.')
             else:
                 figs.append(f.canvas.figure)
         return figs
@@ -132,16 +132,13 @@ def print_figure(fig, fmt="png", bbox_inches="tight", base64=False, **kwargs):
         dpi = dpi * 2
         fmt = 'png'
 
-    # build keyword args
     kw = {
-        "format":fmt,
-        "facecolor":fig.get_facecolor(),
-        "edgecolor":fig.get_edgecolor(),
-        "dpi":dpi,
-        "bbox_inches":bbox_inches,
-    }
-    # **kwargs get higher priority
-    kw.update(kwargs)
+        "format": fmt,
+        "facecolor": fig.get_facecolor(),
+        "edgecolor": fig.get_edgecolor(),
+        "dpi": dpi,
+        "bbox_inches": bbox_inches,
+    } | kwargs
 
     bytes_io = BytesIO()
     if fig.canvas is None:
@@ -264,16 +261,15 @@ def select_figure_formats(shell, formats, **kwargs):
 
     [ f.pop(Figure, None) for f in shell.display_formatter.formatters.values() ]
     mplbackend = matplotlib.get_backend().lower()
-    if mplbackend == 'nbagg' or mplbackend == 'module://ipympl.backend_nbagg':
+    if mplbackend in ['nbagg', 'module://ipympl.backend_nbagg']:
         formatter = shell.display_formatter.ipython_display_formatter
         formatter.for_type(Figure, _reshow_nbagg_figure)
 
     supported = {'png', 'png2x', 'retina', 'jpg', 'jpeg', 'svg', 'pdf'}
-    bad = formats.difference(supported)
-    if bad:
-        bs = "%s" % ','.join([repr(f) for f in bad])
-        gs = "%s" % ','.join([repr(f) for f in supported])
-        raise ValueError("supported formats are: %s not %s" % (gs, bs))
+    if bad := formats.difference(supported):
+        bs = f"{','.join([repr(f) for f in bad])}"
+        gs = f"{','.join([repr(f) for f in supported])}"
+        raise ValueError(f"supported formats are: {gs} not {bs}")
 
     if "png" in formats:
         png_formatter.for_type(

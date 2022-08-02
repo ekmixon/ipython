@@ -31,12 +31,12 @@ class ExtensionMagics(Magics):
         if not module_str:
             raise UsageError('Missing module name.')
         res = self.shell.extension_manager.load_extension(module_str)
-        
+
         if res == 'already loaded':
-            print("The %s extension is already loaded. To reload it, use:" % module_str)
+            print(f"The {module_str} extension is already loaded. To reload it, use:")
             print("  %reload_ext", module_str)
         elif res == 'no load function':
-            print("The %s module is not an IPython extension." % module_str)
+            print(f"The {module_str} module is not an IPython extension.")
 
     @line_magic
     def unload_ext(self, module_str):
@@ -47,13 +47,13 @@ class ExtensionMagics(Magics):
         """
         if not module_str:
             raise UsageError('Missing module name.')
-        
+
         res = self.shell.extension_manager.unload_extension(module_str)
-        
+
         if res == 'no unload function':
             print("The %s extension doesn't define how to unload it." % module_str)
         elif res == "not loaded":
-            print("The %s extension is not loaded." % module_str)
+            print(f"The {module_str} extension is not loaded.")
 
     @line_magic
     def reload_ext(self, module_str):

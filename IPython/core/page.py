@@ -68,7 +68,7 @@ def page_dumb(strng, start=0, screen_lines=25):
         print(os.linesep.join(screens[0]))
     else:
         last_escape = ""
-        for scr in screens[0:-1]:
+        for scr in screens[:-1]:
             hunk = os.linesep.join(scr)
             print(last_escape + hunk)
             if not page_more():
@@ -85,17 +85,17 @@ def _detect_screen_size(screen_lines_def):
     test suite), so it's separated out so it can easily be called in a try block.
     """
     TERM = os.environ.get('TERM',None)
-    if not((TERM=='xterm' or TERM=='xterm-color') and sys.platform != 'sunos5'):
+    if TERM not in ['xterm', 'xterm-color'] or sys.platform == 'sunos5':
         # curses causes problems on many terminals other than xterm, and
         # some termios calls lock up on Sun OS5.
         return screen_lines_def
-    
+
     try:
         import termios
         import curses
     except ImportError:
         return screen_lines_def
-    
+
     # There is a bug in curses, where *sometimes* it fails to properly
     # initialize, and then after the endwin() call is made, the
     # terminal is left in an unusable state.  Rather than trying to
@@ -114,7 +114,7 @@ def _detect_screen_size(screen_lines_def):
     except AttributeError:
         # Curses on Solaris may not be complete, so we can't use it there
         return screen_lines_def
-    
+
     screen_lines_real,screen_cols = scr.getmaxyx()
     curses.endwin()
 
@@ -148,7 +148,7 @@ def pager_page(strng, start=0, screen_lines=0, pager_cmd=None):
     If no system pager works, the string is sent through a 'dumb pager'
     written in python, very simplistic.
     """
-    
+
     # for compatibility with mime-bundle form:
     if isinstance(strng, dict):
         strng = strng['text/plain']
@@ -167,7 +167,7 @@ def pager_page(strng, start=0, screen_lines=0, pager_cmd=None):
     # Dumb heuristics to guesstimate number of on-screen lines the string
     # takes.  Very basic, but good enough for docstrings in reasonable
     # terminals. If someone later feels like refining it, it's not hard.
-    numlines = max(num_newlines,int(len_str/80)+1)
+    numlines = max(num_newlines, len_str // 80 + 1)
 
     screen_lines_def = get_terminal_size()[1]
 
@@ -180,7 +180,7 @@ def pager_page(strng, start=0, screen_lines=0, pager_cmd=None):
             return
 
     #print 'numlines',numlines,'screenlines',screen_lines  # dbg
-    if numlines <= screen_lines :
+    if numlines <= screen_lines:
         #print '*** normal print'  # dbg
         print(str_toprint)
     else:
@@ -189,7 +189,7 @@ def pager_page(strng, start=0, screen_lines=0, pager_cmd=None):
         # value of a failed system command.  If any intermediate attempt
         # sets retval to 1, at the end we resort to our own page_dumb() pager.
         pager_cmd = get_pager_cmd(pager_cmd)
-        pager_cmd += ' ' + get_pager_start(pager_cmd,start)
+        pager_cmd += f' {get_pager_start(pager_cmd, start)}'
         if os.name == 'nt':
             if pager_cmd.startswith('type'):
                 # The default WinXP 'type' command is failing on complex strings.
@@ -201,12 +201,9 @@ def pager_page(strng, start=0, screen_lines=0, pager_cmd=None):
                     os.close(fd)
                     with tmppath.open("wt") as tmpfile:
                         tmpfile.write(strng)
-                        cmd = "%s < %s" % (pager_cmd, tmppath)
+                        cmd = f"{pager_cmd} < {tmppath}"
                     # tmpfile needs to be closed for windows
-                    if os.system(cmd):
-                        retval = 1
-                    else:
-                        retval = None
+                    retval = 1 if os.system(cmd) else None
                 finally:
                     Path.unlink(tmppath)
         else:
@@ -225,10 +222,7 @@ def pager_page(strng, start=0, screen_lines=0, pager_cmd=None):
                 finally:
                     retval = pager.close()
             except IOError as msg:  # broken pipe when user quits
-                if msg.args == (32, 'Broken pipe'):
-                    retval = None
-                else:
-                    retval = 1
+                retval = None if msg.args == (32, 'Broken pipe') else 1
             except OSError:
                 # Other strange problems, sometimes seen in Win2k/cygwin
                 retval = 1
@@ -249,15 +243,13 @@ def page(data, start=0, screen_lines=0, pager_cmd=None):
     # negative value.  Offset to 0 for robustness.
     start = max(0, start)
 
-    # first, try the hook
-    ip = get_ipython()
-    if ip:
+    if ip := get_ipython():
         try:
             ip.hooks.show_in_pager(data, start=start, screen_lines=screen_lines)
             return
         except TryNext:
             pass
-    
+
     # fallback on default pager
     return pager_page(data, start, screen_lines, pager_cmd)
 
@@ -267,12 +259,12 @@ def page_file(fname, start=0, pager_cmd=None):
     """
 
     pager_cmd = get_pager_cmd(pager_cmd)
-    pager_cmd += ' ' + get_pager_start(pager_cmd,start)
+    pager_cmd += f' {get_pager_start(pager_cmd, start)}'
 
     try:
         if os.environ['TERM'] in ['emacs','dumb']:
             raise EnvironmentError
-        system(pager_cmd + ' ' + fname)
+        system(f'{pager_cmd} {fname}')
     except:
         try:
             if start > 0:
@@ -310,14 +302,7 @@ def get_pager_start(pager, start):
     This is the '+N' argument which less and more (under Unix) accept.
     """
 
-    if pager in ['less','more']:
-        if start:
-            start_string = '+' + str(start)
-        else:
-            start_string = ''
-    else:
-        start_string = ''
-    return start_string
+    return f'+{str(start)}' if pager in ['less','more'] and start else ''
 
 
 # (X)emacs on win32 doesn't like to be bypassed with msvcrt.getch()
@@ -330,16 +315,10 @@ if os.name == 'nt' and os.environ.get('TERM','dumb') != 'emacs':
         """
         sys.stdout.write('---Return to continue, q to quit--- ')
         ans = msvcrt.getwch()
-        if ans in ("q", "Q"):
-            result = False
-        else:
-            result = True
+        result = ans not in ("q", "Q")
         sys.stdout.write("\b"*37 + " "*37 + "\b"*37)
         return result
 else:
     def page_more():
         ans = py3compat.input('---Return to continue, q to quit--- ')
-        if ans.lower().startswith('q'):
-            return False
-        else:
-            return True
+        return not ans.lower().startswith('q')

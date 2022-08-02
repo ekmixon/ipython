@@ -111,7 +111,7 @@ class TimeitResult(object):
 
     def _repr_pretty_(self, p , cycle):
         unic = self.__str__()
-        p.text(u'<TimeitResult : '+unic+u'>')
+        p.text(f'<TimeitResult : {unic}>')
 
 
 class TimeitTemplateFiller(ast.NodeTransformer):
@@ -357,9 +357,8 @@ class ExecutionMagics(Magics):
             page.page(output)
         print(sys_exit, end=' ')
 
-        dump_file = opts.D[0]
         text_file = opts.T[0]
-        if dump_file:
+        if dump_file := opts.D[0]:
             prof.dump_stats(dump_file)
             print(
                 f"\n*** Profile stats marshalled to file {repr(dump_file)}.{sys_exit}"
@@ -373,10 +372,7 @@ class ExecutionMagics(Magics):
                 f"\n*** Profile printout saved to text file {repr(text_file)}.{sys_exit}"
             )
 
-        if 'r' in opts:
-            return stats
-
-        return None
+        return stats if 'r' in opts else None
 
     @line_magic
     def pdb(self, parameter_s=''):
@@ -396,9 +392,7 @@ class ExecutionMagics(Magics):
         without having to type '%pdb on' and rerunning your code, you can use
         the %debug magic."""
 
-        par = parameter_s.strip().lower()
-
-        if par:
+        if par := parameter_s.strip().lower():
             try:
                 new_pdb = {'off':0,'0':0,'on':1,'1':1}[par]
             except KeyError:
@@ -501,12 +495,11 @@ class ExecutionMagics(Magics):
             new_mode = s.strip().capitalize()
             original_mode = interactive_tb.mode
             try:
-                try:
-                    interactive_tb.set_mode(mode=new_mode)
-                except Exception:
-                    xmode_switch_err('user')
-                else:
-                    self.shell.showtraceback()
+                interactive_tb.set_mode(mode=new_mode)
+            except Exception:
+                xmode_switch_err('user')
+            else:
+                self.shell.showtraceback()
             finally:
                 interactive_tb.set_mode(mode=original_mode)
         else:
@@ -729,11 +722,7 @@ class ExecutionMagics(Magics):
 
         sys.argv = [filename] + args  # put in the proper filename
 
-        if 'n' in opts:
-            name = Path(filename).stem
-        else:
-            name = '__main__'
-
+        name = Path(filename).stem if 'n' in opts else '__main__'
         if 'i' in opts:
             # Run in user's interactive namespace
             prog_ns = self.shell.user_ns
@@ -904,11 +893,11 @@ class ExecutionMagics(Magics):
         bdb.Breakpoint.bpbynumber = [None]
         deb.clear_all_breaks()
         if bp_line is not None:
-            # Set an initial breakpoint to stop execution
-            maxtries = 10
             bp_file = bp_file or filename
             checkline = deb.checkline(bp_file, bp_line)
             if not checkline:
+                # Set an initial breakpoint to stop execution
+                maxtries = 10
                 for bp in range(bp_line + 1, bp_line + maxtries + 1):
                     if deb.checkline(bp_file, bp):
                         break
@@ -920,7 +909,7 @@ class ExecutionMagics(Magics):
                            "with the -b option." % bp)
                     raise UsageError(msg)
             # if we find a good linenumber, set the breakpoint
-            deb.do_break('%s:%s' % (bp_file, bp_line))
+            deb.do_break(f'{bp_file}:{bp_line}')
 
         if filename:
             # Mimic Pdb._runscript(...)
@@ -947,7 +936,7 @@ class ExecutionMagics(Magics):
                     break
                 finally:
                     sys.settrace(trace)
-            
+
 
         except:
             etype, value, tb = sys.exc_info()

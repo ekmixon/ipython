@@ -103,6 +103,7 @@ current development version to get better completions.
 """
 
 
+
 # Copyright (c) IPython Development Team.
 # Distributed under the terms of the Modified BSD License.
 #
@@ -167,11 +168,7 @@ _UNICODE_RANGES = [(32, 0x3134b), (0xe0001, 0xe01f0)]
 # Public API
 __all__ = ['Completer','IPCompleter']
 
-if sys.platform == 'win32':
-    PROTECTABLES = ' '
-else:
-    PROTECTABLES = ' ()[]{}?=\\|;:\'#*"^&'
-
+PROTECTABLES = ' ' if sys.platform == 'win32' else ' ()[]{}?=\\|;:\'#*"^&'
 # Protect against returning an enormous number of completions which the frontend
 # may have trouble processing.
 MATCHES_LIMIT = 500
@@ -242,13 +239,12 @@ def has_open_quotes(s):
 
 def protect_filename(s, protectables=PROTECTABLES):
     """Escape a string to protect certain characters."""
-    if set(s) & set(protectables):
-        if sys.platform == "win32":
-            return '"' + s + '"'
-        else:
-            return "".join(("\\" + c if c in protectables else c) for c in s)
-    else:
+    if not set(s) & set(protectables):
         return s
+    if sys.platform == "win32":
+        return '"' + s + '"'
+    else:
+        return "".join(("\\" + c if c in protectables else c) for c in s)
 
 
 def expand_user(path:str) -> Tuple[str, bool, str]:
@@ -283,21 +279,14 @@ def expand_user(path:str) -> Tuple[str, bool, str]:
         tilde_expand = True
         rest = len(path)-1
         newpath = os.path.expanduser(path)
-        if rest:
-            tilde_val = newpath[:-rest]
-        else:
-            tilde_val = newpath
-
+        tilde_val = newpath[:-rest] if rest else newpath
     return newpath, tilde_expand, tilde_val
 
 
 def compress_user(path:str, tilde_expand:bool, tilde_val:str) -> str:
     """Does the opposite of expand_user, with its outputs.
     """
-    if tilde_expand:
-        return path.replace(tilde_val, '~')
-    else:
-        return path
+    return path.replace(tilde_val, '~') if tilde_expand else path
 
 
 def completions_sorting_key(word):
@@ -321,11 +310,11 @@ def completions_sorting_key(word):
 
     if word.startswith('%%'):
         # If there's another % in there, this is something else, so leave it alone
-        if not "%" in word[2:]:
+        if "%" not in word[2:]:
             word = word[2:]
             prio2 = 2
     elif word.startswith('%'):
-        if not "%" in word[1:]:
+        if "%" not in word[1:]:
             word = word[1:]
             prio2 = 1
 
@@ -635,11 +624,7 @@ class Completer(Configurable):
             self.namespace = namespace
 
         # The global namespace, if given, can be bound directly
-        if global_namespace is None:
-            self.global_namespace = {}
-        else:
-            self.global_namespace = global_namespace
-
+        self.global_namespace = {} if global_namespace is None else global_namespace
         self.custom_matchers = []
 
         super(Completer, self).__init__(**kwargs)
@@ -687,7 +672,7 @@ class Completer(Configurable):
                     self.global_namespace.keys()]:
             shortened = {"_".join([sub[0] for sub in word.split('_')]) : word
                          for word in lst if snake_case_re.match(word)}
-            for word in shortened.keys():
+            for word in shortened:
                 if word[:n] == text and word != "__builtins__":
                     match_append(shortened[word])
         return matches
@@ -706,16 +691,13 @@ class Completer(Configurable):
 
         """
 
-        # Another option, seems to work great. Catches things like ''.<tab>
-        m = re.match(r"(\S+(\.\w+)*)\.(\w*)$", text)
-
-        if m:
+        if m := re.match(r"(\S+(\.\w+)*)\.(\w*)$", text):
             expr, attr = m.group(1, 3)
         elif self.greedy:
-            m2 = re.match(r"(.+)\.(\w*)$", self.line_buffer)
-            if not m2:
+            if m2 := re.match(r"(.+)\.(\w*)$", self.line_buffer):
+                expr, attr = m2.group(1,2)
+            else:
                 return []
-            expr, attr = m2.group(1,2)
         else:
             return []
 
@@ -744,7 +726,7 @@ class Completer(Configurable):
             pass
         # Build match list to return
         n = len(attr)
-        return [u"%s.%s" % (expr, w) for w in words if w[:n] == attr ]
+        return [f"{expr}.{w}" for w in words if w[:n] == attr]
 
 
 def get__all__entries(obj):
@@ -781,7 +763,7 @@ def match_dict_keys(keys: List[Union[str, bytes, Tuple[Union[str, bytes]]]], pre
     ``matches`` a list of replacement/completion
 
     """
-    prefix_tuple = extra_prefix if extra_prefix else ()
+    prefix_tuple = extra_prefix or ()
     Nprefix = len(prefix_tuple)
     def filter_prefix_tuple(key):
         # Reject too short keys
@@ -847,11 +829,11 @@ def match_dict_keys(keys: List[Union[str, bytes, Tuple[Union[str, bytes]]]], pre
             rem_repr = rem_repr.replace('"', '\\"')
 
         # then reinsert prefix from start of token
-        matched.append('%s%s' % (token_prefix, rem_repr))
+        matched.append(f'{token_prefix}{rem_repr}')
     return quote, token_start, matched
 
 
-def cursor_to_position(text:str, line:int, column:int)->int:
+def cursor_to_position(text:str, line:int, column:int) -> int:
     """
     Convert the (line,column) position of the cursor in text to an offset in a
     string.
@@ -875,11 +857,11 @@ def cursor_to_position(text:str, line:int, column:int)->int:
 
     """
     lines = text.split('\n')
-    assert line <= len(lines), '{} <= {}'.format(str(line), str(len(lines)))
+    assert line <= len(lines), f'{line} <= {len(lines)}'
 
     return sum(len(l) + 1 for l in lines[:line]) + column
 
-def position_to_cursor(text:str, offset:int)->Tuple[int, int]:
+def position_to_cursor(text:str, offset:int) -> Tuple[int, int]:
     """
     Convert the position of the cursor in text (0 indexed) to a line
     number(0-indexed) and a column number (0-indexed) pair
@@ -904,7 +886,7 @@ def position_to_cursor(text:str, offset:int)->Tuple[int, int]:
 
     """
 
-    assert 0 <= offset <= len(text) , "0 <= %s <= %s" % (offset , len(text))
+    assert 0 <= offset <= len(text), f"0 <= {offset} <= {len(text)}"
 
     before = text[:offset]
     blines = before.split('\n')  # ! splitnes trim trailing \n
@@ -1052,10 +1034,7 @@ class IPCompleter(Completer):
     @observe('greedy')
     def _greedy_changed(self, change):
         """update the splitter and readline delims when greedy is changed"""
-        if change['new']:
-            self.splitter.delims = GREEDY_DELIMS
-        else:
-            self.splitter.delims = DELIMS
+        self.splitter.delims = GREEDY_DELIMS if change['new'] else DELIMS
 
     dict_keys_only = Bool(False,
         help="""Whether to show dict key matches only""")
@@ -1217,13 +1196,12 @@ class IPCompleter(Completer):
         return self.complete(text)[1]
 
     def _clean_glob(self, text:str):
-        return self.glob("%s*" % text)
+        return self.glob(f"{text}*")
 
     def _clean_glob_win32(self, text:str):
-        return [f.replace("\\","/")
-                for f in self.glob("%s*" % text)]
+        return [f.replace("\\","/") for f in self.glob(f"{text}*")]
 
-    def file_matches(self, text:str)->List[str]:
+    def file_matches(self, text:str) -> List[str]:
         """Match filenames, expanding ~USER type strings.
 
         Most of the seemingly convoluted logic in this completer is an
@@ -1291,19 +1269,18 @@ class IPCompleter(Completer):
             len_lsplit = len(lsplit)
             matches = [text_prefix + text0 +
                        protect_filename(f[len_lsplit:]) for f in m0]
-        else:
-            if open_quotes:
-                # if we have a string with an open quote, we don't need to
-                # protect the names beyond the quote (and we _shouldn't_, as
-                # it would cause bugs when the filesystem call is made).
-                matches = m0 if sys.platform == "win32" else\
+        elif open_quotes:
+            # if we have a string with an open quote, we don't need to
+            # protect the names beyond the quote (and we _shouldn't_, as
+            # it would cause bugs when the filesystem call is made).
+            matches = m0 if sys.platform == "win32" else\
                     [protect_filename(f, open_quotes) for f in m0]
-            else:
-                matches = [text_prefix +
-                           protect_filename(f) for f in m0]
+        else:
+            matches = [text_prefix +
+                       protect_filename(f) for f in m0]
 
         # Mark directories in input list by appending '/' to their names.
-        return [x+'/' if os.path.isdir(x) else x for x in matches]
+        return [f'{x}/' if os.path.isdir(x) else x for x in matches]
 
     def magic_matches(self, text:str):
         """Match magics"""
@@ -1351,11 +1328,17 @@ class IPCompleter(Completer):
         """ Match class names and attributes for %config magic """
         texts = text.strip().split()
 
-        if len(texts) > 0 and (texts[0] == 'config' or texts[0] == '%config'):
+        if texts and texts[0] in ['config', '%config']:
             # get all configuration classes
-            classes = sorted(set([ c for c in self.shell.configurables
-                                   if c.__class__.class_traits(config=True)
-                                   ]), key=lambda x: x.__class__.__name__)
+            classes = sorted(
+                {
+                    c
+                    for c in self.shell.configurables
+                    if c.__class__.class_traits(config=True)
+                },
+                key=lambda x: x.__class__.__name__,
+            )
+
             classnames = [ c.__class__.__name__ for c in classes ]
 
             # return all classnames if config or %config is given
@@ -1372,7 +1355,7 @@ class IPCompleter(Completer):
             if texts[1].find('.') < 0:
                 return classname_matches
             elif len(classname_matches) == 1 and \
-                            classname_matches[0] == classname:
+                                classname_matches[0] == classname:
                 cls = classes[classnames.index(classname)].__class__
                 help = cls.class_get_help()
                 # strip leading '--' from cl-args:
@@ -1382,7 +1365,7 @@ class IPCompleter(Completer):
                          if attr.startswith(texts[1]) ]
         return []
 
-    def magic_color_matches(self, text:str) -> List[str] :
+    def magic_color_matches(self, text:str) -> List[str]:
         """ Match color schemes for %colors magic"""
         texts = text.split()
         if text.endswith(' '):
@@ -1390,7 +1373,7 @@ class IPCompleter(Completer):
             # so that: '%colors ' -> ['%colors', '']
             texts.append('')
 
-        if len(texts) == 2 and (texts[0] == 'colors' or texts[0] == '%colors'):
+        if len(texts) == 2 and texts[0] in ['colors', '%colors']:
             prefix = texts[1]
             return [ color for color in InspectColors.keys()
                      if color.startswith(prefix) ]
@@ -1432,7 +1415,7 @@ class IPCompleter(Completer):
                 elif self.omit__names == 0:
                     completion_filter = lambda x:x
                 else:
-                    raise ValueError("Don't understand self.omit__names == {}".format(self.omit__names))
+                    raise ValueError(f"Don't understand self.omit__names == {self.omit__names}")
 
         interpreter = jedi.Interpreter(text[:offset], namespaces)
         try_jedi = True
@@ -1567,16 +1550,17 @@ class IPCompleter(Completer):
         # parenthesis before the cursor
         # e.g. for "foo (1+bar(x), pa<cursor>,a=1)", the candidate is "foo"
         tokens = regexp.findall(self.text_until_cursor)
-        iterTokens = reversed(tokens); openPar = 0
+        iterTokens = reversed(tokens)
+        openPar = 0
 
         for token in iterTokens:
-            if token == ')':
-                openPar -= 1
-            elif token == '(':
+            if token == '(':
                 openPar += 1
                 if openPar > 0:
                     # found the last unclosed parenthesis
                     break
+            elif token == ')':
+                openPar -= 1
         else:
             return []
         # 2. Concatenate dotted names ("foo.bar" for "foo.bar(x, pa" )
@@ -1588,7 +1572,7 @@ class IPCompleter(Completer):
                 ids.append(next(iterTokens))
                 if not isId(ids[-1]):
                     ids.pop(); break
-                if not next(iterTokens) == '.':
+                if next(iterTokens) != '.':
                     break
             except StopIteration:
                 break
@@ -1618,9 +1602,12 @@ class IPCompleter(Completer):
                                                     self.namespace))
 
             # Remove used named arguments from the list, no need to show twice
-            for namedArg in set(namedArgs) - usedNamedArgs:
-                if namedArg.startswith(text):
-                    argMatches.append("%s=" %namedArg)
+            argMatches.extend(
+                f"{namedArg}="
+                for namedArg in set(namedArgs) - usedNamedArgs
+                if namedArg.startswith(text)
+            )
+
         except:
             pass
 
@@ -1724,11 +1711,7 @@ class IPCompleter(Completer):
             key_start = completion_start = match.end()
 
         # grab the leading prefix, to make sure all completions start with `text`
-        if text_start > key_start:
-            leading = ''
-        else:
-            leading = text[text_start:completion_start]
-
+        leading = '' if text_start > key_start else text[text_start:completion_start]
         # the index of the `[` character
         bracket_idx = match.end(1)
 
@@ -1743,15 +1726,13 @@ class IPCompleter(Completer):
                 continuation = continuation[len(closing_quote):]
             else:
                 suf += closing_quote
-        if bracket_idx > text_start:
-            # brackets were opened inside text, maybe close them
-            if not continuation.startswith(']'):
-                suf += ']'
+        if bracket_idx > text_start and not continuation.startswith(']'):
+            suf += ']'
 
         return [leading + k + suf for k in matches]
 
     @staticmethod
-    def unicode_name_matches(text:str) -> Tuple[str, List[str]] :
+    def unicode_name_matches(text:str) -> Tuple[str, List[str]]:
         """Match Latex-like syntax for unicode characters base
         on the name of the character.
 
@@ -1763,10 +1744,10 @@ class IPCompleter(Completer):
         slashpos = text.rfind('\\')
         if slashpos > -1:
             s = text[slashpos+1:]
-            try :
+            try:
                 unic = unicodedata.lookup(s)
                 # allow combining chars
-                if ('a'+unic).isidentifier():
+                if f'a{unic}'.isidentifier():
                     return '\\'+s,[unic]
             except KeyError:
                 pass
@@ -1785,12 +1766,8 @@ class IPCompleter(Completer):
                 # Try to complete a full latex symbol to unicode
                 # \\alpha -> α
                 return s, [latex_symbols[s]]
-            else:
-                # If a user has partially typed a latex symbol, give them
-                # a full list of options \al -> [\aleph, \alpha]
-                matches = [k for k in latex_symbols if k.startswith(s)]
-                if matches:
-                    return s, matches
+            if matches := [k for k in latex_symbols if k.startswith(s)]:
+                return s, matches
         return '', ()
 
     def dispatch_custom_completer(self, text):
@@ -1811,21 +1788,18 @@ class IPCompleter(Completer):
         event.text_until_cursor = self.text_until_cursor
 
         # for foo etc, try also to find completer for %foo
-        if not cmd.startswith(self.magic_escape):
-            try_magic = self.custom_completers.s_matches(
-                self.magic_escape + cmd)
-        else:
-            try_magic = []
+        try_magic = (
+            []
+            if cmd.startswith(self.magic_escape)
+            else self.custom_completers.s_matches(self.magic_escape + cmd)
+        )
 
         for c in itertools.chain(self.custom_completers.s_matches(cmd),
                  try_magic,
                  self.custom_completers.flat_matches(self.text_until_cursor)):
             try:
-                res = c(event)
-                if res:
-                    # first, try case sensitive match
-                    withcase = [r for r in res if r.startswith(text)]
-                    if withcase:
+                if res := c(event):
+                    if withcase := [r for r in res if r.startswith(text)]:
                         return withcase
                     # if none, then case insensitive ones are ok too
                     text_low = text.lower()
@@ -1841,7 +1815,7 @@ class IPCompleter(Completer):
 
         return None
 
-    def completions(self, text: str, offset: int)->Iterator[Completion]:
+    def completions(self, text: str, offset: int) -> Iterator[Completion]:
         """
         Returns an iterator over the possible completions
 
@@ -1910,7 +1884,6 @@ class IPCompleter(Completer):
         except KeyboardInterrupt:
             """if completions take too long and users send keyboard interrupt,
             do not crash and return ASAP. """
-            pass
         finally:
             if profiler is not None:
                 profiler.disable()
@@ -1964,10 +1937,7 @@ class IPCompleter(Completer):
                         print("Error in Jedi getting type of ", jm)
                     type_ = None
                 delta = len(jm.name_with_symbols) - len(jm.complete)
-                if type_ == 'function':
-                    signature = _make_signature(jm)
-                else:
-                    signature = ''
+                signature = _make_signature(jm) if type_ == 'function' else ''
                 yield Completion(start=offset - delta,
                                  end=offset,
                                  text=jm.name_with_symbols,
@@ -2083,7 +2053,7 @@ class IPCompleter(Completer):
 
         if self.backslash_combining_completions:
             # allow deactivation of these on windows.
-            base_text = text if not line_buffer else line_buffer[:cursor_pos]
+            base_text = line_buffer[:cursor_pos] if line_buffer else text
 
             for meth in (self.latex_matches,
                          self.unicode_name_matches,
@@ -2093,7 +2063,7 @@ class IPCompleter(Completer):
                 name_text, name_matches = meth(base_text)
                 if name_text:
                     return _CompleteResult(name_text, name_matches[:MATCHES_LIMIT], \
-                           [meth.__qualname__]*min(len(name_matches), MATCHES_LIMIT), ())
+                               [meth.__qualname__]*min(len(name_matches), MATCHES_LIMIT), ())
 
 
         # If no line buffer is given, assume the input text is all there was
@@ -2140,7 +2110,7 @@ class IPCompleter(Completer):
                             for m in matcher(text)]
                 if matches:
                     break
-                    
+
         seen = set()
         filtered_matches = set()
         for m in matches:
@@ -2152,9 +2122,9 @@ class IPCompleter(Completer):
         _filtered_matches = sorted(filtered_matches, key=lambda x: completions_sorting_key(x[0]))
 
         custom_res = [(m, 'custom') for m in self.dispatch_custom_completer(text) or []]
-        
+
         _filtered_matches = custom_res or _filtered_matches
-        
+
         _filtered_matches = _filtered_matches[:MATCHES_LIMIT]
         _matches = [m[0] for m in _filtered_matches]
         origins = [m[1] for m in _filtered_matches]
@@ -2193,23 +2163,19 @@ class IPCompleter(Completer):
         # But need to be timed and adds an extra dependency.
 
         slashpos = text.rfind('\\')
-        # if text starts with slash
-        if slashpos > -1:
-            # PERF: It's important that we don't access self._unicode_names
-            # until we're inside this if-block. _unicode_names is lazily
-            # initialized, and it takes a user-noticeable amount of time to
-            # initialize it, so we don't want to initialize it unless we're
-            # actually going to use it.
-            s = text[slashpos+1:]
-            candidates = [x for x in self.unicode_names if x.startswith(s)]
-            if candidates:
-                return s, candidates
-            else:
-                return '', ()
-
-        # if text does not start with slash
-        else:
+        if slashpos <= -1:
             return '', ()
+        # PERF: It's important that we don't access self._unicode_names
+        # until we're inside this if-block. _unicode_names is lazily
+        # initialized, and it takes a user-noticeable amount of time to
+        # initialize it, so we don't want to initialize it unless we're
+        # actually going to use it.
+        s = text[slashpos+1:]
+        return (
+            (s, candidates)
+            if (candidates := [x for x in self.unicode_names if x.startswith(s)])
+            else ('', ())
+        )
 
     @property
     def unicode_names(self) -> List[str]:
@@ -2219,7 +2185,7 @@ class IPCompleter(Completer):
         """
         if self._unicode_names is None:
             names = []
-            for c in range(0,0x10FFFF + 1):
+            for c in range(0x10FFFF + 1):
                 try:
                     names.append(unicodedata.name(chr(c)))
                 except ValueError:

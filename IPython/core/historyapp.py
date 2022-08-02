@@ -63,9 +63,9 @@ class HistoryTrim(BaseIPythonApplication):
             print("There are already at most %d entries in the history database." % self.keep)
             print("Not doing anything. Use --keep= argument to keep fewer entries")
             return
-        
+
         print("Trimming history to the most recent %d entries." % self.keep)
-        
+
         inputs.pop() # Remove the extra element we got to check the length.
         inputs.reverse()
         if inputs:
@@ -75,14 +75,14 @@ class HistoryTrim(BaseIPythonApplication):
             sessions = list(con.execute('SELECT session, start, end, num_cmds, remark FROM '
                                         'sessions WHERE session >= ?', (first_session,)))
         con.close()
-        
+
         # Create the new history database.
         new_hist_file = os.path.join(profile_dir, 'history.sqlite.new')
         i = 0
         while os.path.exists(new_hist_file):
             # Make sure we don't interfere with an existing file.
             i += 1
-            new_hist_file = os.path.join(profile_dir, 'history.sqlite.new'+str(i))
+            new_hist_file = os.path.join(profile_dir, f'history.sqlite.new{i}')
         new_db = sqlite3.connect(new_hist_file)
         new_db.execute("""CREATE TABLE IF NOT EXISTS sessions (session integer
                             primary key autoincrement, start timestamp,
@@ -114,7 +114,7 @@ class HistoryTrim(BaseIPythonApplication):
             print("Backed up longer history file to", backup_hist_file)
         else:
             os.remove(hist_file)
-        
+
         os.rename(new_hist_file, hist_file)
 
 class HistoryClear(HistoryTrim):
@@ -150,12 +150,13 @@ class HistoryApp(Application):
     ))
 
     def start(self):
-        if self.subapp is None:
-            print("No subcommand specified. Must specify one of: %s" % \
-                                                    (self.subcommands.keys()))
-            print()
-            self.print_description()
-            self.print_subcommands()
-            self.exit(1)
-        else:
+        if self.subapp is not None:
             return self.subapp.start()
+        print(
+            f"No subcommand specified. Must specify one of: {self.subcommands.keys()}"
+        )
+
+        print()
+        self.print_description()
+        self.print_subcommands()
+        self.exit(1)

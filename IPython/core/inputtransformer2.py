@@ -26,12 +26,18 @@ def leading_empty_lines(lines):
     If the leading lines are empty or contain only whitespace, they will be
     removed.
     """
-    if not lines:
-        return lines
-    for i, line in enumerate(lines):
-        if line and not line.isspace():
-            return lines[i:]
-    return lines
+    return (
+        next(
+            (
+                lines[i:]
+                for i, line in enumerate(lines)
+                if line and not line.isspace()
+            ),
+            lines,
+        )
+        if lines
+        else lines
+    )
 
 def leading_indent(lines):
     """Remove leading indentation.
@@ -82,7 +88,7 @@ class PromptStripper:
         if not lines:
             return lines
         if self.initial_re.match(lines[0]) or \
-                (len(lines) > 1 and self.prompt_re.match(lines[1])):
+                    (len(lines) > 1 and self.prompt_re.match(lines[1])):
             return self._strip(lines)
         return lines
 
@@ -346,20 +352,22 @@ def _tr_help(content):
 
     A naked help line should fire the intro help screen (shell.show_usage())
     """
-    if not content:
-        return 'get_ipython().show_usage()'
-
-    return _make_help_call(content, '?')
+    return (
+        _make_help_call(content, '?')
+        if content
+        else 'get_ipython().show_usage()'
+    )
 
 def _tr_help2(content):
     """Translate lines escaped with: ??
 
     A naked help line should fire the intro help screen (shell.show_usage())
     """
-    if not content:
-        return 'get_ipython().show_usage()'
-
-    return _make_help_call(content, '??')
+    return (
+        _make_help_call(content, '??')
+        if content
+        else 'get_ipython().show_usage()'
+    )
 
 def _tr_magic(content):
     "Translate lines escaped with a percent sign: %"
@@ -379,7 +387,7 @@ def _tr_quote2(content):
 def _tr_paren(content):
     "Translate lines escaped with a slash: /"
     name, _, args = content.partition(' ')
-    return '%s(%s)' % (name, ", ".join(args.split()))
+    return f'{name}({", ".join(args.split())})'
 
 tr = { ESC_SHELL  : 'get_ipython().system({!r})'.format,
        ESC_SH_CAP : 'get_ipython().getoutput({!r})'.format,
@@ -422,11 +430,7 @@ class EscapedCommand(TokenTransformBase):
         else:
             escape, content = line[:1], line[1:]
 
-        if escape in tr:
-            call = tr[escape](content)
-        else:
-            call = ''
-
+        call = tr[escape](content) if escape in tr else ''
         lines_before = lines[:start_line]
         new_line = indent + call + '\n'
         lines_after = lines[end_line + 1:]
@@ -483,7 +487,7 @@ class HelpEnd(TokenTransformBase):
         # If we're mid-command, put it back on the next prompt for the user.
         next_input = None
         if (not lines_before) and (not lines_after) \
-                and content.strip() != m.group(0):
+                    and content.strip() != m.group(0):
             next_input = content.rstrip('?\n')
 
         call = _make_help_call(target, esc, next_input=next_input)
@@ -600,8 +604,7 @@ class TransformerManager:
         tokens_by_line = make_tokens_by_line(lines)
         candidates = []
         for transformer_cls in self.token_transformers:
-            transformer = transformer_cls.find(tokens_by_line)
-            if transformer:
+            if transformer := transformer_cls.find(tokens_by_line):
                 candidates.append(transformer)
 
         if not candidates:
@@ -764,17 +767,12 @@ class TransformerManager:
             return 'incomplete', find_last_indent(lines)
 
         # If there's a blank line at the end, assume we're ready to execute
-        if not lines[-1].strip():
-            return 'complete', None
-
-        return 'complete', None
+        return ('complete', None) if lines[-1].strip() else ('complete', None)
 
 
 def find_last_indent(lines):
     m = _indent_re.match(lines[-1])
-    if not m:
-        return 0
-    return len(m.group(0).replace('\t', ' '*4))
+    return len(m.group(0).replace('\t', ' '*4)) if m else 0
 
 
 class MaybeAsyncCompile(Compile):

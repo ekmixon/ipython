@@ -4,6 +4,7 @@ IPython: tools for interactive and parallel computing in Python.
 
 https://ipython.org
 """
+
 #-----------------------------------------------------------------------------
 #  Copyright (c) 2008-2011, IPython Development Team.
 #  Copyright (c) 2001-2007, Fernando Perez <fernando.perez@colorado.edu>
@@ -56,7 +57,7 @@ from .utils.sysinfo import sys_info
 from .utils.frame import extract_module_locals
 
 # Release data
-__author__ = '%s <%s>' % (release.author, release.author_email)
+__author__ = f'{release.author} <{release.author_email}>'
 __license__  = release.license
 __version__  = release.version
 version_info = release.version_info

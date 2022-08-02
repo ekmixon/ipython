@@ -39,7 +39,7 @@ def recompute_unicode_ranges():
     import itertools
     import unicodedata
     valid = []
-    for c in range(0,0x10FFFF + 1):
+    for c in range(0x10FFFF + 1):
         try:
             unicodedata.name(chr(c))
         except ValueError:
@@ -183,8 +183,8 @@ def test_line_split():
 
 
 class NamedInstanceMetaclass(type):
-    def __getitem__(cls, item):
-        return cls.get_instance(item)
+    def __getitem__(self, item):
+        return self.get_instance(item)
 
 
 class NamedInstanceClass(metaclass=NamedInstanceMetaclass):
@@ -516,7 +516,7 @@ class TestCompleter(unittest.TestCase):
             )
             ip.Completer.use_jedi = False
 
-        assert len(l) == 1, "Completions (Z.z<tab>) correctly deduplicate: %s " % l
+        assert len(l) == 1, f"Completions (Z.z<tab>) correctly deduplicate: {l} "
         assert l[0].text == "zoo"  # and not `it.accumulate`
 
     def test_greedy_completions(self):
@@ -859,7 +859,7 @@ class TestCompleter(unittest.TestCase):
         does return what expected, and does not crash.
         """
         delims = " \t\n`!@#$^&*()=+[{]}\\|;:'\",<>?"
-        
+
         keys = [("foo", "bar"), ("foo", "oof"), ("foo", b"bar"), ('other', 'test')]
 
         # Completion on first key == "foo"
@@ -1098,23 +1098,6 @@ class TestCompleter(unittest.TestCase):
         self.assertIn("'abc'", matches)
         self.assertIn("b'abd'", matches)
 
-        if False:  # not currently implemented
-            _, matches = complete(line_buffer="d[b")
-            self.assertIn("b'abd'", matches)
-            self.assertNotIn("b'abc'", matches)
-
-            _, matches = complete(line_buffer="d[b'")
-            self.assertIn("abd", matches)
-            self.assertNotIn("abc", matches)
-
-            _, matches = complete(line_buffer="d[B'")
-            self.assertIn("abd", matches)
-            self.assertNotIn("abc", matches)
-
-            _, matches = complete(line_buffer="d['")
-            self.assertIn("abc", matches)
-            self.assertNotIn("abd", matches)
-
     def test_dict_key_completion_unicode_py3(self):
         """Test handling of unicode in dict key completion"""
         ip = get_ipython()
@@ -1165,8 +1148,8 @@ class TestCompleter(unittest.TestCase):
         with greedy_completion():
             ip.user_ns["d"] = numpy.zeros(2, dtype=dt)
             _, matches = complete(line_buffer="d[1]['my_head']['")
-            self.assertTrue(any(["my_dt" in m for m in matches]))
-            self.assertTrue(any(["my_df" in m for m in matches]))
+            self.assertTrue(any("my_dt" in m for m in matches))
+            self.assertTrue(any("my_df" in m for m in matches))
 
     @dec.skip_without("pandas")
     def test_dataframe_key_completion(self):

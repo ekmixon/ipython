@@ -40,28 +40,13 @@ class AsyncTest(TestCase):
     def _get_top_level_cases(self):
         # These are test cases that should be valid in a function
         # but invalid outside of a function.
-        test_cases = []
-        test_cases.append(('basic', "{val}"))
-
-        # Note, in all conditional cases, I use True instead of
-        # False so that the peephole optimizer won't optimize away
-        # the return, so CPython will see this as a syntax error:
-        #
-        # while True:
-        #    break
-        #    return
-        #
-        # But not this:
-        #
-        # while False:
-        #    return
-        #
-        # See https://bugs.python.org/issue1875
-
-        test_cases.append(('if', dedent("""
+        test_cases = [
+            ('basic', "{val}"),
+            ('if', dedent("""
         if True:
             {val}
-        """)))
+        """)),
+        ]
 
         test_cases.append(('while', dedent("""
         while True:
@@ -122,12 +107,13 @@ class AsyncTest(TestCase):
         # This is a mix of tests that should be a syntax error if
         # return or yield whether or not they are in a function
 
-        test_cases = []
-
-        test_cases.append(('class', dedent("""
+        test_cases = [
+            ('class', dedent("""
         class V:
             {val}
-        """)))
+        """))
+        ]
+
 
         test_cases.append(('nested-class', dedent("""
         class V:
@@ -158,7 +144,7 @@ class AsyncTest(TestCase):
             # It should fail with all the values
             for val in vals:
                 with self.subTest((test_name, val)):
-                    msg = "Syntax error not raised for %s, %s" % (test_name, val)
+                    msg = f"Syntax error not raised for {test_name}, {val}"
                     with self.assertRaises(SyntaxError, msg=msg):
                         iprc(test_case.format(val=val))
 
@@ -220,8 +206,7 @@ class AsyncTest(TestCase):
 
                     with self.subTest(test_id):
                         if should_fail:
-                            msg = ("SyntaxError not raised for %s" %
-                                    str(test_id))
+                            msg = f"SyntaxError not raised for {test_id}"
                             with self.assertRaises(SyntaxError, msg=msg):
                                 iprc(cell)
 

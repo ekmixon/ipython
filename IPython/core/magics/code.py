@@ -108,7 +108,7 @@ def extract_symbols(code, symbols):
     code = code.split('\n')
 
     symbols_lines = {}
-    
+
     # we already know the start_lineno of each symbol (marks). 
     # To find each end_lineno, we traverse in reverse order until each 
     # non-blank line
@@ -122,7 +122,7 @@ def extract_symbols(code, symbols):
 
     # Now symbols_lines is a map
     # {'symbol_name': (start_lineno, end_lineno), ...}
-    
+
     # fill a list with chunks of codes for each requested symbol
     blocks = []
     not_found = []
@@ -144,9 +144,7 @@ def strip_initial_indent(lines):
 
     it = iter(lines)
     first_line = next(it)
-    indent_match = indent_re.match(first_line)
-
-    if indent_match:
+    if indent_match := indent_re.match(first_line):
         # First line was indented
         indent = indent_match.group()
         yield first_line[len(indent):]
@@ -162,8 +160,7 @@ def strip_initial_indent(lines):
         yield first_line
 
     # Pass the remaining lines through without dedenting
-    for line in it:
-        yield line
+    yield from it
 
 
 class InteractivelyDefined(Exception):
@@ -225,7 +222,10 @@ class CodeMagics(Magics):
         file_exists = os.path.isfile(fname)
         if file_exists and not force and not append:
             try:
-                overwrite = self.shell.ask_yes_no('File `%s` exists. Overwrite (y/[N])? ' % fname, default='n')
+                overwrite = self.shell.ask_yes_no(
+                    f'File `{fname}` exists. Overwrite (y/[N])? ', default='n'
+                )
+
             except StdinNotImplementedError:
                 print("File `%s` exists. Use `%%save -f %s` to force overwrite" % (fname, parameter_s))
                 return
@@ -244,7 +244,7 @@ class CodeMagics(Magics):
             # make sure we end on a newline
             if not cmds.endswith('\n'):
                 f.write('\n')
-        print('The following commands were written to file `%s`:' % fname)
+        print(f'The following commands were written to file `{fname}`:')
         print(cmds)
 
     @line_magic
@@ -296,8 +296,9 @@ class CodeMagics(Magics):
 
         request = Request(
             "https://dpaste.com/api/v2/",
-            headers={"User-Agent": "IPython v{}".format(version)},
+            headers={"User-Agent": f"IPython v{version}"},
         )
+
         response = urlopen(request, post_data)
         return response.headers.get('Location')
 
@@ -366,7 +367,7 @@ class CodeMagics(Magics):
                 return
 
             if len(not_found) == 1:
-                warn('The symbol `%s` was not found' % not_found[0])
+                warn(f'The symbol `{not_found[0]}` was not found')
             elif len(not_found) > 1:
                 warn('The symbols %s were not found' % get_text_list(not_found,
                                                                      wrap_item_with='`')
@@ -388,16 +389,16 @@ class CodeMagics(Magics):
         if l > 200000 and 'y' not in opts:
             try:
                 ans = self.shell.ask_yes_no(("The text you're trying to load seems pretty big"\
-                " (%d characters). Continue (y/[N]) ?" % l), default='n' )
+                    " (%d characters). Continue (y/[N]) ?" % l), default='n' )
             except StdinNotImplementedError:
                 #assume yes if raw input not implemented
                 ans = True
 
-            if ans is False :
+            if not ans:
                 print('Operation cancelled.')
                 return
 
-        contents = "# %load {}\n".format(arg_s) + contents
+        contents = f"# %load {arg_s}\n" + contents
 
         self.shell.set_next_input(contents, replace=True)
 
@@ -412,24 +413,19 @@ class CodeMagics(Magics):
             except IOError:
                 # If it ends with .py but doesn't already exist, assume we want
                 # a new file.
-                if arg.endswith('.py'):
-                    filename = arg
-                else:
-                    filename = None
+                filename = arg if arg.endswith('.py') else None
             return filename
 
         # Set a few locals from the options for convenience:
         opts_prev = 'p' in opts
         opts_raw = 'r' in opts
 
-        # custom exceptions
         class DataIsObject(Exception): pass
-
         # Default line number value
         lineno = opts.get('n',None)
 
         if opts_prev:
-            args = '_%s' % last_call[0]
+            args = f'_{last_call[0]}'
             if args not in shell.user_ns:
                 args = last_call[1]
 
@@ -474,7 +470,7 @@ class CodeMagics(Magics):
                     filename = find_file(data)
                     if filename:
                         if 'fakemodule' in filename.lower() and \
-                            inspect.isclass(data):
+                                inspect.isclass(data):
                             # class created by %edit? Try to find source
                             # by looking for method definitions instead, the
                             # __module__ in those classes is FakeModule.
@@ -484,12 +480,12 @@ class CodeMagics(Magics):
                                     continue
                                 filename = find_file(attr)
                                 if filename and \
-                                  'fakemodule' not in filename.lower():
+                                      'fakemodule' not in filename.lower():
                                     # change the attribute to be the edit
                                     # target instead
                                     data = attr
                                     break
-                        
+
                         m = ipython_input_pat.match(os.path.basename(filename))
                         if m:
                             raise InteractivelyDefined(int(m.groups()[0])) from e

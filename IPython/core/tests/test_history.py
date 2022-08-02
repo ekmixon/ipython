@@ -124,7 +124,7 @@ def test_history():
 
             # Cross testing: check that magic %save can get previous session.
             testfilename = (tmp_path / "test.py").resolve()
-            ip.magic("save " + str(testfilename) + " ~1/1-3")
+            ip.magic(f"save {str(testfilename)} ~1/1-3")
             with io.open(testfilename, encoding="utf-8") as testfile:
                 assert testfile.read() == "# coding: utf-8\n" + "\n".join(hist) + "\n"
 

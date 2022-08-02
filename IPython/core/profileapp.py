@@ -96,27 +96,25 @@ ipython locate profile foo # print the path to the directory for profile 'foo'
 
 def list_profiles_in(path):
     """list profiles in a given root directory"""
-    profiles = []
-
     # for python 3.6+ rewrite to: with os.scandir(path) as dirlist:
     files = os.scandir(path)
-    for f in files:
-        if f.is_dir() and f.name.startswith('profile_'):
-            profiles.append(f.name.split('_', 1)[-1])
-    return profiles
+    return [
+        f.name.split('_', 1)[-1]
+        for f in files
+        if f.is_dir() and f.name.startswith('profile_')
+    ]
 
 
 def list_bundled_profiles():
     """list profiles that are bundled with IPython."""
     path = os.path.join(get_ipython_package_dir(), u'core', u'profile')
-    profiles = []
-
     # for python 3.6+ rewrite to: with os.scandir(path) as dirlist:
     files =  os.scandir(path)
-    for profile in files:
-        if profile.is_dir() and profile.name != "__pycache__":
-            profiles.append(profile.name)
-    return profiles
+    return [
+        profile.name
+        for profile in files
+        if profile.is_dir() and profile.name != "__pycache__"
+    ]
 
 
 class ProfileLocate(BaseIPythonApplication):
@@ -159,31 +157,28 @@ class ProfileList(Application):
     def _print_profiles(self, profiles):
         """print list of profiles, indented."""
         for profile in profiles:
-            print('    %s' % profile)
+            print(f'    {profile}')
 
     def list_profile_dirs(self):
-        profiles = list_bundled_profiles()
-        if profiles:
+        if profiles := list_bundled_profiles():
             print()
             print("Available profiles in IPython:")
             self._print_profiles(profiles)
             print()
             print("    The first request for a bundled profile will copy it")
-            print("    into your IPython directory (%s)," % self.ipython_dir)
+            print(f"    into your IPython directory ({self.ipython_dir}),")
             print("    where you can customize it.")
-        
-        profiles = list_profiles_in(self.ipython_dir)
-        if profiles:
+
+        if profiles := list_profiles_in(self.ipython_dir):
             print()
-            print("Available profiles in %s:" % self.ipython_dir)
+            print(f"Available profiles in {self.ipython_dir}:")
             self._print_profiles(profiles)
-        
-        profiles = list_profiles_in(os.getcwd())
-        if profiles:
+
+        if profiles := list_profiles_in(os.getcwd()):
             print()
-            print("Available profiles in current directory (%s):" % os.getcwd())
+            print(f"Available profiles in current directory ({os.getcwd()}):")
             self._print_profiles(profiles)
-        
+
         print()
         print("To use any of the above profiles, start IPython with:")
         print("    ipython --profile=<name>")
@@ -194,7 +189,7 @@ class ProfileList(Application):
 
 
 create_flags = {}
-create_flags.update(base_flags)
+create_flags |= base_flags
 # don't include '--init' flag, which implies running profile create in other apps
 create_flags.pop('init')
 create_flags['reset'] = ({'ProfileCreate': {'overwrite' : True}},
@@ -301,11 +296,13 @@ class ProfileApp(Application):
     ))
 
     def start(self):
-        if self.subapp is None:
-            print("No subcommand specified. Must specify one of: %s"%(self.subcommands.keys()))
-            print()
-            self.print_description()
-            self.print_subcommands()
-            self.exit(1)
-        else:
+        if self.subapp is not None:
             return self.subapp.start()
+        print(
+            f"No subcommand specified. Must specify one of: {self.subcommands.keys()}"
+        )
+
+        print()
+        self.print_description()
+        self.print_subcommands()
+        self.exit(1)

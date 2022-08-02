@@ -53,7 +53,7 @@ class Logger(object):
     # logmode is a validated property
     def _set_mode(self,mode):
         if mode not in ['append','backup','global','over','rotate']:
-            raise ValueError('invalid log mode %s given' % mode)
+            raise ValueError(f'invalid log mode {mode} given')
         self._logmode = mode
 
     def _get_mode(self):
@@ -68,8 +68,7 @@ class Logger(object):
         Raises RuntimeError if the log has already been started"""
 
         if self.logfile is not None:
-            raise RuntimeError('Log file is already active: %s' %
-                               self.logfname)
+            raise RuntimeError(f'Log file is already active: {self.logfname}')
 
         # The parameters can override constructor defaults
         if logfname is not None: self.logfname = logfname
@@ -90,7 +89,7 @@ class Logger(object):
 
         elif logmode == 'backup':
             if isfile(self.logfname):
-                backup_logname = self.logfname+'~'
+                backup_logname = f'{self.logfname}~'
                 # Manually remove any old backup, since os.rename may fail
                 # under Windows.
                 if isfile(backup_logname):
@@ -109,15 +108,15 @@ class Logger(object):
 
         elif logmode == 'rotate':
             if isfile(self.logfname):
-                if isfile(self.logfname+'.001~'):
-                    old = glob.glob(self.logfname+'.*~')
+                if isfile(f'{self.logfname}.001~'):
+                    old = glob.glob(f'{self.logfname}.*~')
                     old.sort()
                     old.reverse()
                     for f in old:
                         root, ext = os.path.splitext(f)
                         num = int(ext[1:-1])+1
-                        os.rename(f, root+'.'+repr(num).zfill(3)+'~')
-                os.rename(self.logfname, self.logfname+'.001~')
+                        os.rename(f, f'{root}.{repr(num).zfill(3)}~')
+                os.rename(self.logfname, f'{self.logfname}.001~')
             self.logfile = io.open(self.logfname, 'w', encoding='utf-8')
 
         if logmode != 'append':
@@ -133,8 +132,6 @@ class Logger(object):
             raise ValueError('Call switch_log ONLY with a boolean argument, '
                              'not with: %s' % val)
 
-        label = {0:'OFF',1:'ON',False:'OFF',True:'ON'}
-
         if self.logfile is None:
             print("""
 Logging hasn't been started yet (use logstart for that).
@@ -144,6 +141,8 @@ which already exists. But you must first start the logging process with
 %logstart (optionally giving a logfile name).""")
 
         else:
+            label = {0:'OFF',1:'ON',False:'OFF',True:'ON'}
+
             if self.log_active == val:
                 print('Logging is already',label[val])
             else:
@@ -156,7 +155,7 @@ which already exists. But you must first start the logging process with
         if self.logfile is None:
             print('Logging has not been activated.')
         else:
-            state = self.log_active and 'active' or 'temporarily suspended'
+            state = 'active' if self.log_active else 'temporarily suspended'
             print('Filename       :', self.logfname)
             print('Mode           :', self.logmode)
             print('Output logging :', self.log_output)
@@ -195,8 +194,7 @@ which already exists. But you must first start the logging process with
                     write(time.strftime('# %a, %d %b %Y %H:%M:%S\n', time.localtime()))
                 write(data)
             elif kind=='output' and self.log_output:
-                odata = u'\n'.join([u'#[Out]# %s' % s
-                                   for s in data.splitlines()])
+                odata = u'\n'.join([f'#[Out]# {s}' for s in data.splitlines()])
                 write(u'%s\n' % odata)
             self.logfile.flush()
 

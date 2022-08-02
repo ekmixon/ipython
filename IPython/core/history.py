@@ -38,7 +38,7 @@ class DummyDB(object):
     """Dummy DB that will act as a black hole for history.
 
     Only used in the absence of sqlite"""
-    def execute(*args, **kwargs):
+    def execute(self, **kwargs):
         return []
 
     def commit(self, *args, **kwargs):
@@ -54,10 +54,7 @@ class DummyDB(object):
 @decorator
 def only_when_enabled(f, self, *a, **kw):
     """Decorator: return an empty list in the absence of sqlite."""
-    if not self.enabled:
-        return []
-    else:
-        return f(self, *a, **kw)
+    return f(self, *a, **kw) if self.enabled else []
 
 
 # use 16kB as threshold for whether a corrupt history db should be saved
@@ -78,36 +75,35 @@ def catch_corrupt_db(f, self, *a, **kw):
     except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
         self._corrupt_db_counter += 1
         self.log.error("Failed to open SQLite history %s (%s).", self.hist_file, e)
-        if self.hist_file != ':memory:':
-            if self._corrupt_db_counter > self._corrupt_db_limit:
-                self.hist_file = ':memory:'
-                self.log.error("Failed to load history too many times, history will not be saved.")
-            elif self.hist_file.is_file():
-                # move the file out of the way
-                base = str(self.hist_file.parent / self.hist_file.stem)
-                ext = self.hist_file.suffix
-                size = self.hist_file.stat().st_size
-                if size >= _SAVE_DB_SIZE:
-                    # if there's significant content, avoid clobbering
-                    now = datetime.datetime.now().isoformat().replace(':', '.')
-                    newpath = base + '-corrupt-' + now + ext
-                    # don't clobber previous corrupt backups
-                    for i in range(100):
-                        if not Path(newpath).exists():
-                            break
-                        else:
-                            newpath = base + '-corrupt-' + now + (u'-%i' % i) + ext
-                else:
-                    # not much content, possibly empty; don't worry about clobbering
-                    # maybe we should just delete it?
-                    newpath = base + '-corrupt' + ext
-                self.hist_file.rename(newpath)
-                self.log.error("History file was moved to %s and a new file created.", newpath)
-            self.init_db()
-            return []
-        else:
+        if self.hist_file == ':memory:':
             # Failed with :memory:, something serious is wrong
             raise
+        if self._corrupt_db_counter > self._corrupt_db_limit:
+            self.hist_file = ':memory:'
+            self.log.error("Failed to load history too many times, history will not be saved.")
+        elif self.hist_file.is_file():
+            # move the file out of the way
+            base = str(self.hist_file.parent / self.hist_file.stem)
+            ext = self.hist_file.suffix
+            size = self.hist_file.stat().st_size
+            if size >= _SAVE_DB_SIZE:
+                # if there's significant content, avoid clobbering
+                now = datetime.datetime.now().isoformat().replace(':', '.')
+                newpath = f'{base}-corrupt-{now}{ext}'
+                    # don't clobber previous corrupt backups
+                for i in range(100):
+                    if not Path(newpath).exists():
+                        break
+                    else:
+                        newpath = f'{base}-corrupt-{now}' + u'-%i' % i + ext
+            else:
+                    # not much content, possibly empty; don't worry about clobbering
+                    # maybe we should just delete it?
+                newpath = f'{base}-corrupt{ext}'
+            self.hist_file.rename(newpath)
+            self.log.error("History file was moved to %s and a new file created.", newpath)
+        self.init_db()
+        return []
 
 
 class HistoryAccessorBase(LoggingConfigurable):
@@ -186,7 +182,7 @@ class HistoryAccessor(HistoryAccessorBase):
         connection_types = (DummyDB, sqlite3.Connection)
         if not isinstance(new, connection_types):
             msg = "%s.db must be sqlite3 Connection or DummyDB, not %r" % \
-                    (self.__class__.__name__, new)
+                        (self.__class__.__name__, new)
             raise TraitError(msg)
 
     def __init__(self, profile="default", hist_file="", **traits):
@@ -240,7 +236,7 @@ class HistoryAccessor(HistoryAccessorBase):
 
         # use detect_types so that timestamps return datetime objects
         kwargs = dict(detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
-        kwargs.update(self.connection_options)
+        kwargs |= self.connection_options
         self.db = sqlite3.connect(str(self.hist_file), **kwargs)
         self.db.execute("""CREATE TABLE IF NOT EXISTS sessions (session integer
                         primary key autoincrement, start timestamp,
@@ -285,9 +281,11 @@ class HistoryAccessor(HistoryAccessorBase):
         sqlfrom = "history"
         if output:
             sqlfrom = "history LEFT JOIN output_history USING (session, line)"
-            toget = "history.%s, output_history.output" % toget
-        cur = self.db.execute("SELECT session, line, %s FROM %s " %\
-                                (toget, sqlfrom) + sql, params)
+            toget = f"history.{toget}, output_history.output"
+        cur = self.db.execute(
+            (f"SELECT session, line, {toget} FROM {sqlfrom} " + sql), params
+        )
+
         if output:    # Regroup into 3-tuples, and parse JSON
             return ((ses, lin, (inp, out)) for ses, lin, inp, out in cur)
         return cur
@@ -354,9 +352,7 @@ class HistoryAccessor(HistoryAccessorBase):
             n += 1
         cur = self._run_sql("ORDER BY session DESC, line DESC LIMIT ?",
                                 (n,), raw=raw, output=output)
-        if not include_latest:
-            return reversed(list(cur)[1:])
-        return reversed(list(cur))
+        return reversed(list(cur)) if include_latest else reversed(list(cur)[1:])
 
     @catch_corrupt_db
     def search(self, pattern="*", raw=True, search_raw=True,
@@ -384,9 +380,9 @@ class HistoryAccessor(HistoryAccessorBase):
         """
         tosearch = "source_raw" if search_raw else "source"
         if output:
-            tosearch = "history." + tosearch
+            tosearch = f"history.{tosearch}"
         self.writeout_cache()
-        sqlform = "WHERE %s GLOB ?" % tosearch
+        sqlform = f"WHERE {tosearch} GLOB ?"
         params = (pattern,)
         if unique:
             sqlform += ' GROUP BY {0}'.format(tosearch)
@@ -396,9 +392,7 @@ class HistoryAccessor(HistoryAccessorBase):
         elif unique:
             sqlform += " ORDER BY session, line"
         cur = self._run_sql(sqlform, params, raw=raw, output=output)
-        if n is not None:
-            return reversed(list(cur))
-        return cur
+        return reversed(list(cur)) if n is not None else cur
 
     @catch_corrupt_db
     def get_range(self, session, start=1, stop=None, raw=True,output=False):
@@ -435,8 +429,9 @@ class HistoryAccessor(HistoryAccessorBase):
             lineclause = "line>=?"
             params = (session, start)
 
-        return self._run_sql("WHERE session==? AND %s" % lineclause,
-                                    params, raw=raw, output=output)
+        return self._run_sql(
+            f"WHERE session==? AND {lineclause}", params, raw=raw, output=output
+        )
 
     def get_range_by_str(self, rangestr, raw=True, output=False):
         """Get lines of history from a string of ranges, as used by magic
@@ -458,8 +453,7 @@ class HistoryAccessor(HistoryAccessorBase):
         Tuples as :meth:`get_range`
         """
         for sess, s, e in extract_hist_ranges(rangestr):
-            for line in self.get_range(sess, s, e, raw=raw, output=output):
-                yield line
+            yield from self.get_range(sess, s, e, raw=raw, output=output)
 
 
 class HistoryManager(HistoryAccessor):
@@ -722,7 +716,7 @@ class HistoryManager(HistoryAccessor):
         self._i00 = source_raw
 
         # hackish access to user namespace to create _i1,_i2... dynamically
-        new_i = '_i%s' % line_num
+        new_i = f'_i{line_num}'
         to_main = {'_i': self._i,
                    '_ii': self._ii,
                    '_iii': self._iii,
@@ -902,6 +896,4 @@ def extract_hist_ranges(ranges_str):
 
 def _format_lineno(session, line):
     """Helper function to format line numbers properly."""
-    if session == 0:
-        return str(line)
-    return "%s#%s" % (session, line)
+    return str(line) if session == 0 else f"{session}#{line}"

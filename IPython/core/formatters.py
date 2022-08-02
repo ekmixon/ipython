@@ -47,10 +47,7 @@ class DisplayFormatter(Configurable):
     @observe('active_types')
     def _active_types_changed(self, change):
         for key, formatter in self.formatters.items():
-            if key in change['new']:
-                formatter.enabled = True
-            else:
-                formatter.enabled = False
+            formatter.enabled = key in change['new']
 
     ipython_display_formatter = ForwardDeclaredInstance('FormatterABC')
     @default('ipython_display_formatter')
@@ -140,7 +137,7 @@ class DisplayFormatter(Configurable):
         """
         format_dict = {}
         md_dict = {}
-        
+
         if self.ipython_display_formatter(obj):
             # object handled itself, don't proceed
             return {}, {}
@@ -172,18 +169,18 @@ class DisplayFormatter(Configurable):
                 continue
             if exclude and format_type in exclude:
                 continue
-            
+
             md = None
             try:
                 data = formatter(obj)
             except:
                 # FIXME: log the exception
                 raise
-            
+
             # formatters can return raw data or (data, metadata)
             if isinstance(data, tuple) and len(data) == 2:
                 data, md = data
-            
+
             if data is not None:
                 format_dict[format_type] = data
             if md is not None:
@@ -341,9 +338,7 @@ class BaseFormatter(Configurable):
             method = get_real_method(obj, self.print_method)
             if method is not None:
                 return method()
-            return None
-        else:
-            return None
+        return None
     
     def __contains__(self, typ):
         """map in to lookup_by_type"""
@@ -360,13 +355,12 @@ class BaseFormatter(Configurable):
         Return the value if so, None otherwise, warning if invalid.
         """
         if r is None or isinstance(r, self._return_type) or \
-            (isinstance(r, tuple) and r and isinstance(r[0], self._return_type)):
+                (isinstance(r, tuple) and r and isinstance(r[0], self._return_type)):
             return r
         else:
             warnings.warn(
-                "%s formatter returned invalid type %s (expected %s) for object: %s" % \
-                (self.format_type, type(r), self._return_type, _safe_repr(obj)),
-                FormatterWarning
+                f"{self.format_type} formatter returned invalid type {type(r)} (expected {self._return_type}) for object: {_safe_repr(obj)}",
+                FormatterWarning,
             )
     
     def lookup(self, obj):
@@ -410,19 +404,18 @@ class BaseFormatter(Configurable):
         """
         if isinstance(typ, str):
             typ_key = tuple(typ.rsplit('.',1))
-            if typ_key not in self.deferred_printers:
-                # We may have it cached in the type map. We will have to
-                # iterate over all of the types to check.
-                for cls in self.type_printers:
-                    if _mod_name_key(cls) == typ_key:
-                        return self.type_printers[cls]
-            else:
+            if typ_key in self.deferred_printers:
                 return self.deferred_printers[typ_key]
+            # We may have it cached in the type map. We will have to
+            # iterate over all of the types to check.
+            for cls in self.type_printers:
+                if _mod_name_key(cls) == typ_key:
+                    return self.type_printers[cls]
         else:
             for cls in pretty._get_mro(typ):
                 if cls in self.type_printers or self._in_deferred_types(cls):
                     return self.type_printers[cls]
-        
+
         # If we have reached here, the lookup failed.
         raise KeyError("No registered printer for {0!r}".format(typ))
 
@@ -522,10 +515,12 @@ class BaseFormatter(Configurable):
         ------
         KeyError if the type is not registered and default is not specified.
         """
-        
+
         if isinstance(typ, str):
             typ_key = tuple(typ.rsplit('.',1))
-            if typ_key not in self.deferred_printers:
+            if typ_key in self.deferred_printers:
+                old = self.deferred_printers.pop(typ_key)
+            else:
                 # We may have it cached in the type map. We will have to
                 # iterate over all of the types to check.
                 for cls in self.type_printers:
@@ -534,13 +529,10 @@ class BaseFormatter(Configurable):
                         break
                 else:
                     old = default
-            else:
-                old = self.deferred_printers.pop(typ_key)
+        elif typ in self.type_printers:
+            old = self.type_printers.pop(typ)
         else:
-            if typ in self.type_printers:
-                old = self.type_printers.pop(typ)
-            else:
-                old = self.deferred_printers.pop(_mod_name_key(typ), default)
+            old = self.deferred_printers.pop(_mod_name_key(typ), default)
         if old is _raise_key_error:
             raise KeyError("No registered value for {0!r}".format(typ))
         return old
@@ -693,17 +685,16 @@ class PlainTextFormatter(BaseFormatter):
         """Compute the pretty representation of the object."""
         if not self.pprint:
             return repr(obj)
-        else:
-            stream = StringIO()
-            printer = pretty.RepresentationPrinter(stream, self.verbose,
-                self.max_width, self.newline,
-                max_seq_length=self.max_seq_length,
-                singleton_pprinters=self.singleton_printers,
-                type_pprinters=self.type_printers,
-                deferred_pprinters=self.deferred_printers)
-            printer.pretty(obj)
-            printer.flush()
-            return stream.getvalue()
+        stream = StringIO()
+        printer = pretty.RepresentationPrinter(stream, self.verbose,
+            self.max_width, self.newline,
+            max_seq_length=self.max_seq_length,
+            singleton_pprinters=self.singleton_printers,
+            type_pprinters=self.type_printers,
+            deferred_pprinters=self.deferred_printers)
+        printer.pretty(obj)
+        printer.flush()
+        return stream.getvalue()
 
 
 class HTMLFormatter(BaseFormatter):
@@ -944,9 +935,7 @@ class MimeBundleFormatter(BaseFormatter):
         # always return (data, metadata):
         if r is None:
             return {}, {}
-        if not isinstance(r, tuple):
-            return r, {}
-        return r
+        return r if isinstance(r, tuple) else (r, {})
 
     @catch_format_error
     def __call__(self, obj, include=None, exclude=None):
@@ -970,9 +959,7 @@ class MimeBundleFormatter(BaseFormatter):
 
             if method is not None:
                 return method(include=include, exclude=exclude)
-            return None
-        else:
-            return None
+        return None
 
 
 FormatterABC.register(BaseFormatter)

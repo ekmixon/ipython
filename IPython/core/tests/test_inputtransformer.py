@@ -20,10 +20,7 @@ def transform_checker(tests, transformer, **kwargs):
     transformer = transformer(**kwargs)
     try:
         for inp, tr in tests:
-            if inp is None:
-                out = transformer.reset()
-            else:
-                out = transformer.push(inp)
+            out = transformer.reset() if inp is None else transformer.push(inp)
             assert out == tr
     finally:
         transformer.reset()

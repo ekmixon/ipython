@@ -336,7 +336,7 @@ class Pdb(OldPdb):
             save_main = sys.modules['__main__']
             # No IPython instance running, we must create one
             from IPython.terminal.interactiveshell import \
-                TerminalInteractiveShell
+                    TerminalInteractiveShell
             self.shell = TerminalInteractiveShell.instance()
             # needed by any code which calls __import__("__main__") after
             # the debugger was entered. See also #9941.
@@ -446,9 +446,9 @@ class Pdb(OldPdb):
         """Perform useful escapes on the command before it is executed."""
 
         if line.endswith("??"):
-            line = "pinfo2 " + line[:-2]
+            line = f"pinfo2 {line[:-2]}"
         elif line.endswith("?"):
-            line = "pinfo " + line[:-1]
+            line = f"pinfo {line[:-1]}"
 
         line = super().precmd(line)
 
@@ -537,10 +537,7 @@ class Pdb(OldPdb):
         So if frame is self.current_frame we instead return self.curframe_locals
 
         """
-        if frame is self.curframe:
-            return self.curframe_locals
-        else:
-            return frame.f_locals
+        return self.curframe_locals if frame is self.curframe else frame.f_locals
 
     def format_stack_entry(self, frame_lineno, lprefix=': ', context=None):
         if context is None:
@@ -553,8 +550,6 @@ class Pdb(OldPdb):
                 print("Context must be a positive integer", file=self.stdout)
 
         import reprlib
-
-        ret = []
 
         Colors = self.color_scheme_table.active_colors
         ColorsNormal = Colors.Normal
@@ -571,23 +566,15 @@ class Pdb(OldPdb):
             rv = loc_frame["__return__"]
             # return_value += '->'
             return_value += reprlib.repr(rv) + "\n"
-        ret.append(return_value)
-
+        ret = [return_value]
         #s = filename + '(' + `lineno` + ')'
         filename = self.canonic(frame.f_code.co_filename)
         link = tpl_link % py3compat.cast_unicode(filename)
 
-        if frame.f_code.co_name:
-            func = frame.f_code.co_name
-        else:
-            func = "<lambda>"
-
+        func = frame.f_code.co_name or "<lambda>"
         call = ""
         if func != "?":
-            if "__args__" in loc_frame:
-                args = reprlib.repr(loc_frame["__args__"])
-            else:
-                args = '()'
+            args = reprlib.repr(loc_frame["__args__"]) if "__args__" in loc_frame else '()'
             call = tpl_call % (func, args)
 
         # The level info should be generated in the same format pdb uses, to
@@ -630,15 +617,17 @@ class Pdb(OldPdb):
         if bp:
             Colors = self.color_scheme_table.active_colors
             bp_mark = str(bp.number)
-            bp_mark_color = Colors.breakpoint_enabled
-            if not bp.enabled:
-                bp_mark_color = Colors.breakpoint_disabled
+            bp_mark_color = (
+                Colors.breakpoint_enabled
+                if bp.enabled
+                else Colors.breakpoint_disabled
+            )
 
         numbers_width = 7
         if arrow:
             # This is the line with the error
             pad = numbers_width - len(str(lineno)) - len(bp_mark)
-            num = '%s%s' % (make_arrow(pad), str(lineno))
+            num = f'{make_arrow(pad)}{str(lineno)}'
         else:
             num = '%*s' % (numbers_width - len(bp_mark), str(lineno))
 
@@ -814,7 +803,7 @@ class Pdb(OldPdb):
         p = self.__class__(completekey=self.completekey,
                            stdin=self.stdin, stdout=self.stdout)
         p.use_rawinput = self.use_rawinput
-        p.prompt = "(%s) " % self.prompt.strip()
+        p.prompt = f"({self.prompt.strip()}) "
         self.message("ENTERING RECURSIVE DEBUGGER")
         sys.call_tracing(p.run, (arg, globals, locals))
         self.message("LEAVING RECURSIVE DEBUGGER")
@@ -910,8 +899,7 @@ class Pdb(OldPdb):
 
         """
 
-        sup = super().break_anywhere(frame)
-        if sup:
+        if sup := super().break_anywhere(frame):
             return sup
         if self._predicates["debuggerskip"]:
             if DEBUGGERSKIP in frame.f_code.co_varnames:
@@ -952,16 +940,13 @@ class Pdb(OldPdb):
         if self._is_in_decorator_internal_and_should_skip(frame) is True:
             return False
 
-        hidden = False
-        if self.skip_hidden:
-            hidden = self._hidden_predicate(frame)
-        if hidden:
-            if self.report_skipped:
-                Colors = self.color_scheme_table.active_colors
-                ColorsNormal = Colors.Normal
-                print(
-                    f"{Colors.excName}    [... skipped 1 hidden frame]{ColorsNormal}\n"
-                )
+        hidden = self._hidden_predicate(frame) if self.skip_hidden else False
+        if hidden and self.report_skipped:
+            Colors = self.color_scheme_table.active_colors
+            ColorsNormal = Colors.Normal
+            print(
+                f"{Colors.excName}    [... skipped 1 hidden frame]{ColorsNormal}\n"
+            )
         return super().stop_here(frame)
 
     def do_up(self, arg):
@@ -979,7 +964,7 @@ class Pdb(OldPdb):
         try:
             count = int(arg or 1)
         except ValueError:
-            self.error("Invalid frame count (%s)" % arg)
+            self.error(f"Invalid frame count ({arg})")
             return
         skipped = 0
         if count < 0:
@@ -1023,7 +1008,7 @@ class Pdb(OldPdb):
         try:
             count = int(arg or 1)
         except ValueError:
-            self.error("Invalid frame count (%s)" % arg)
+            self.error(f"Invalid frame count ({arg})")
             return
         if count < 0:
             _newframe = len(self.stack) - 1

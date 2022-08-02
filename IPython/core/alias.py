@@ -97,7 +97,7 @@ def default_aliases():
                           # things which are executable
                           ('lx', 'ls -F -l -G %l | grep ^-..x'),
                           ]
-        default_aliases = default_aliases + ls_aliases
+        default_aliases += ls_aliases
     elif os.name in ['nt', 'dos']:
         default_aliases = [('ls', 'dir /on'),
                            ('ddir', 'dir /ad /on'), ('ldir', 'dir /ad /on'),
@@ -130,7 +130,7 @@ class Alias(object):
         self.shell = shell
         self.name = name
         self.cmd = cmd
-        self.__doc__ = "Alias for `!{}`".format(cmd)
+        self.__doc__ = f"Alias for `!{cmd}`"
         self.nargs = self.validate()
 
     def validate(self):
@@ -152,7 +152,7 @@ class Alias(object):
                                     "got: %r" % self.cmd)
 
         nargs = self.cmd.count('%s') - self.cmd.count('%%s')
-  
+
         if (nargs > 0) and (self.cmd.find('%l') >= 0):
             raise InvalidAliasError('The %s and %l specifiers are mutually '
                                     'exclusive in alias definitions.')
@@ -169,19 +169,21 @@ class Alias(object):
         if cmd.find('%l') >= 0:
             cmd = cmd.replace('%l', rest)
             rest = ''
-        
+
         if nargs==0:
             if cmd.find('%%s') >= 1:
                 cmd = cmd.replace('%%s', '%s')
             # Simple, argument-less aliases
-            cmd = '%s %s' % (cmd, rest)
+            cmd = f'{cmd} {rest}'
         else:
             # Handle aliases with positional arguments
             args = rest.split(None, nargs)
             if len(args) < nargs:
-                raise UsageError('Alias <%s> requires %s arguments, %s given.' %
-                      (self.name, nargs, len(args)))
-            cmd = '%s %s' % (cmd % tuple(args[:nargs]),' '.join(args[nargs:]))
+                raise UsageError(
+                    f'Alias <{self.name}> requires {nargs} arguments, {len(args)} given.'
+                )
+
+            cmd = f"{cmd % tuple(args[:nargs])} {' '.join(args[nargs:])}"
 
         self.shell.system(cmd)
 
@@ -218,7 +220,7 @@ class AliasManager(Configurable):
         try:
             self.define_alias(name, cmd)
         except AliasError as e:
-            error("Invalid alias: %s" % e)
+            error(f"Invalid alias: {e}")
 
     def define_alias(self, name, cmd):
         """Define a new alias after validating it.
@@ -243,7 +245,7 @@ class AliasManager(Configurable):
         if self.is_alias(name):
             del self.linemagics[name]
         else:
-            raise ValueError('%s is not an alias' % name)
+            raise ValueError(f'{name} is not an alias')
 
     def clear_aliases(self):
         for name, cmd in self.aliases:
@@ -251,8 +253,7 @@ class AliasManager(Configurable):
 
     def retrieve_alias(self, name):
         """Retrieve the command to which an alias expands."""
-        caller = self.get_alias(name)
-        if caller:
+        if caller := self.get_alias(name):
             return caller.cmd
         else:
-            raise ValueError('%s is not an alias' % name)
+            raise ValueError(f'{name} is not an alias')

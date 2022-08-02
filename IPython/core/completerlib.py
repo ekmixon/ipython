@@ -82,8 +82,7 @@ def module_list(path):
         # recurse more than one level into subdirectories.
         files = []
         for root, dirs, nondirs in os.walk(path, followlinks=True):
-            subdir = root[len(path)+1:]
-            if subdir:
+            if subdir := root[len(path) + 1 :]:
                 files.extend(pjoin(subdir, f) for f in nondirs)
                 dirs[:] = [] # Do not recurse into additional subdirectories.
             else:
@@ -98,8 +97,7 @@ def module_list(path):
     # Build a list of modules which match the import_re regex.
     modules = []
     for f in files:
-        m = import_re.match(f)
-        if m:
+        if m := import_re.match(f):
             modules.append(m.group('name'))
     return list(set(modules))
 
@@ -152,7 +150,7 @@ def is_importable(module, attr, only_modules):
     if only_modules:
         return inspect.ismodule(getattr(module, attr))
     else:
-        return not(attr[:2] == '__' and attr[-2:] == '__')
+        return attr[:2] != '__' or attr[-2:] != '__'
 
 def is_possible_submodule(module, attr):
     try:
@@ -297,13 +295,23 @@ def magic_run_completer(self, event):
     # be arguments to the input script.
 
     if any(magic_run_re.match(c) for c in comps):
-        matches =  [f.replace('\\','/') + ('/' if isdir(f) else '')
-                            for f in lglob(relpath+'*')]
+        matches = [
+            f.replace('\\', '/') + ('/' if isdir(f) else '')
+            for f in lglob(f'{relpath}*')
+        ]
+
     else:
-        dirs = [f.replace('\\','/') + "/" for f in lglob(relpath+'*') if isdir(f)]
-        pys =  [f.replace('\\','/')
-                for f in lglob(relpath+'*.py') + lglob(relpath+'*.ipy') +
-                lglob(relpath+'*.ipynb') + lglob(relpath + '*.pyw')]
+        dirs = [f.replace('\\','/') + "/" for f in lglob(f'{relpath}*') if isdir(f)]
+        pys = [
+            f.replace('\\', '/')
+            for f in (
+                lglob(f'{relpath}*.py')
+                + lglob(f'{relpath}*.ipy')
+                + lglob(f'{relpath}*.ipynb')
+            )
+            + lglob(f'{relpath}*.pyw')
+        ]
+
 
         matches = dirs + pys
 
@@ -318,32 +326,22 @@ def cd_completer(self, event):
 
     #print(event) # dbg
     if event.line.endswith('-b') or ' -b ' in event.line:
-        # return only bookmark completions
-        bkms = self.db.get('bookmarks', None)
-        if bkms:
-            return bkms.keys()
-        else:
-            return []
-
+        return bkms.keys() if (bkms := self.db.get('bookmarks', None)) else []
     if event.symbol == '-':
         width_dh = str(len(str(len(ip.user_ns['_dh']) + 1)))
         # jump in directory history by number
-        fmt = '-%0' + width_dh +'d [%s]'
+        fmt = f'-%0{width_dh}d [%s]'
         ents = [ fmt % (i,s) for i,s in enumerate(ip.user_ns['_dh'])]
-        if len(ents) > 1:
-            return ents
-        return []
-
+        return ents if len(ents) > 1 else []
     if event.symbol.startswith('--'):
-        return ["--" + os.path.basename(d) for d in ip.user_ns['_dh']]
+        return [f"--{os.path.basename(d)}" for d in ip.user_ns['_dh']]
 
     # Expand ~ in path and normalize directory separators.
     relpath, tilde_expand, tilde_val = expand_user(relpath)
     relpath = relpath.replace('\\','/')
 
     found = []
-    for d in [f.replace('\\','/') + '/' for f in glob.glob(relpath+'*')
-              if os.path.isdir(f)]:
+    for d in [f.replace('\\','/') + '/' for f in glob.glob(f'{relpath}*') if os.path.isdir(f)]:
         if ' ' in d:
             # we don't want to deal with any of that, complex code
             # for this is elsewhere
@@ -357,8 +355,7 @@ def cd_completer(self, event):
 
         # if no completions so far, try bookmarks
         bks = self.db.get('bookmarks',{})
-        bkmatches = [s for s in bks if s.startswith(event.symbol)]
-        if bkmatches:
+        if bkmatches := [s for s in bks if s.startswith(event.symbol)]:
             return bkmatches
 
         raise TryNext

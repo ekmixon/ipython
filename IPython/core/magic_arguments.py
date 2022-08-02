@@ -83,17 +83,17 @@ class MagicHelpFormatter(argparse.RawDescriptionHelpFormatter):
             if action.nargs == 0:
                 parts.extend(action.option_strings)
 
-            # if the Optional takes a value, format is:
-            #    -s ARGS, --long ARGS
             else:
                 default = action.dest.upper()
                 args_string = self._format_args(action, default)
                 # IPYTHON MODIFICATION: If args_string is not a plain name, wrap
                 # it in <> so it's valid RST.
                 if not NAME_RE.match(args_string):
-                    args_string = "<%s>" % args_string
-                for option_string in action.option_strings:
-                    parts.append('%s %s' % (option_string, args_string))
+                    args_string = f"<{args_string}>"
+                parts.extend(
+                    f'{option_string} {args_string}'
+                    for option_string in action.option_strings
+                )
 
             return ', '.join(parts)
 

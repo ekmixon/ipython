@@ -76,8 +76,7 @@ def editor(self, filename, linenum=None, wait=True):
         editor = '"%s"' % editor
 
     # Call the actual editor
-    proc = subprocess.Popen('%s %s %s' % (editor, linemark, filename),
-                            shell=True)
+    proc = subprocess.Popen(f'{editor} {linemark} {filename}', shell=True)
     if wait and proc.wait() != 0:
         raise TryNext()
 
@@ -94,10 +93,7 @@ class CommandChainDispatcher:
 
     """
     def __init__(self,commands=None):
-        if commands is None:
-            self.chain = []
-        else:
-            self.chain = commands
+        self.chain = [] if commands is None else commands
 
 
     def __call__(self,*args, **kw):
@@ -177,14 +173,13 @@ def clipboard_get(self):
         osx_clipboard_get, tkinter_clipboard_get,
         win32_clipboard_get
     )
-    if sys.platform == 'win32':
-        chain = [win32_clipboard_get, tkinter_clipboard_get]
-    elif sys.platform == 'darwin':
+    if sys.platform == 'darwin':
         chain = [osx_clipboard_get, tkinter_clipboard_get]
+    elif sys.platform == 'win32':
+        chain = [win32_clipboard_get, tkinter_clipboard_get]
     else:
         chain = [tkinter_clipboard_get]
     dispatcher = CommandChainDispatcher()
     for func in chain:
         dispatcher.add(func)
-    text = dispatcher()
-    return text
+    return dispatcher()

@@ -142,7 +142,7 @@ class HistoryMagics(Magics):
             """Helper function to format line numbers properly."""
             if session in (0, history_manager.session_number):
                 return str(line)
-            return "%s/%s" % (session, line)
+            return f"{session}/{line}"
 
         # Check if output to specific file was requested.
         outfname = args.filename
@@ -173,10 +173,7 @@ class HistoryMagics(Magics):
 
         range_pattern = False
         if args.pattern is not None and not args.range:
-            if args.pattern:
-                pattern = "*" + " ".join(args.pattern) + "*"
-            else:
-                pattern = "*"
+            pattern = "*" + " ".join(args.pattern) + "*" if args.pattern else "*"
             hist = history_manager.search(pattern, raw=raw, output=get_output,
                                           n=limit, unique=args.unique)
             print_nums = True
@@ -203,16 +200,19 @@ class HistoryMagics(Magics):
             # into an editor.
             if get_output:
                 inline, output = inline
-            if range_pattern:
-                if not fnmatch.fnmatch(inline, range_pattern):
-                    continue
+            if range_pattern and not fnmatch.fnmatch(inline, range_pattern):
+                continue
             inline = inline.expandtabs(4).rstrip()
 
             multiline = "\n" in inline
             line_sep = '\n' if multiline else ' '
             if print_nums:
-                print(u'%s:%s' % (_format_lineno(session, lineno).rjust(width),
-                        line_sep),  file=outfile, end=u'')
+                print(
+                    f'{_format_lineno(session, lineno).rjust(width)}:{line_sep}',
+                    file=outfile,
+                    end=u'',
+                )
+
             if pyprompts:
                 print(u">>> ", end=u"", file=outfile)
                 if multiline:
@@ -264,15 +264,14 @@ class HistoryMagics(Magics):
             return
                                     # Get history range
         histlines = self.shell.history_manager.get_range_by_str(arg)
-        cmd = "\n".join(x[2] for x in histlines)
-        if cmd:
+        if cmd := "\n".join(x[2] for x in histlines):
             self.shell.set_next_input(cmd.rstrip())
             return
 
         try:                        # Variable in user namespace
             cmd = str(eval(arg, self.shell.user_ns))
-        except Exception:           # Search for term in history
-            histlines = self.shell.history_manager.search("*"+arg+"*")
+        except Exception:   # Search for term in history
+            histlines = self.shell.history_manager.search(f"*{arg}*")
             for h in reversed([x[2] for x in histlines]):
                 if 'recall' in h or 'rep' in h:
                     continue
@@ -312,12 +311,7 @@ class HistoryMagics(Magics):
         elif "g" in opts:       # Search
             p = "*"+opts['g']+"*"
             hist = list(self.shell.history_manager.search(p))
-            for l in reversed(hist):
-                if "rerun" not in l[2]:
-                    hist = [l]     # The last match which isn't a %rerun
-                    break
-            else:
-                hist = []          # No matches except %rerun
+            hist = next(([l] for l in reversed(hist) if "rerun" not in l[2]), [])
         elif args:              # Specify history ranges
             hist = self.shell.history_manager.get_range_by_str(args)
         else:                   # Last line

@@ -280,7 +280,7 @@ def test_check_complete():
     assert cc(example + "\n    ") == ("complete", None)
 
     # no need to loop on all the letters/numbers.
-    short = '12abAB'+string.printable[62:]
+    short = f'12abAB{string.printable[62:]}'
     for c in short:
         # test does not raise:
         cc(c)

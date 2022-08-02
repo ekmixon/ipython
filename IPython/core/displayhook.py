@@ -42,8 +42,11 @@ class DisplayHook(Configurable):
         elif cache_size < cache_size_min:
             self.do_full_cache = 0
             cache_size = 0
-            warn('caching was disabled (min value for cache size is %s).' %
-                 cache_size_min,stacklevel=3)
+            warn(
+                f'caching was disabled (min value for cache size is {cache_size_min}).',
+                stacklevel=3,
+            )
+
         else:
             self.do_full_cache = 1
 
@@ -51,7 +54,7 @@ class DisplayHook(Configurable):
 
         # we need a reference to the user-level namespace
         self.shell = shell
-        
+
         self._,self.__,self.___ = '','',''
 
         # these are deliberately global:
@@ -84,23 +87,20 @@ class DisplayHook(Configurable):
     def quiet(self):
         """Should we silence the display hook because of ';'?"""
         # do not print output if input ends in ';'
-        
+
         try:
             cell = self.shell.history_manager.input_hist_parsed[-1]
         except IndexError:
             # some uses of ipshellembed may fail here
             return False
-        
+
         sio = _io.StringIO(cell)
         tokens = list(tokenize.generate_tokens(sio.readline))
 
         for token in reversed(tokens):
             if token[0] in (tokenize.ENDMARKER, tokenize.NL, tokenize.NEWLINE, tokenize.COMMENT):
                 continue
-            if (token[0] == tokenize.OP) and (token[1] == ';'):
-                return True
-            else:
-                return False
+            return token[0] == tokenize.OP and token[1] == ';'
 
     def start_displayhook(self):
         """Start the displayhook, initializing resources."""
@@ -114,8 +114,8 @@ class DisplayHook(Configurable):
         """
         # Use write, not print which adds an extra space.
         sys.stdout.write(self.shell.separate_out)
-        outprompt = 'Out[{}]: '.format(self.shell.execution_count)
         if self.do_full_cache:
+            outprompt = f'Out[{self.shell.execution_count}]: '
             sys.stdout.write(outprompt)
 
     def compute_format_data(self, result):
@@ -175,17 +175,9 @@ class DisplayHook(Configurable):
         # newline, even if all the prompt separators are ''. This is the
         # standard IPython behavior.
         result_repr = format_dict['text/plain']
-        if '\n' in result_repr:
-            # So that multi-line strings line up with the left column of
-            # the screen, instead of having the output prompt mess up
-            # their first line.
-            # We use the prompt template instead of the expanded prompt
-            # because the expansion may add ANSI escapes that will interfere
-            # with our ability to determine whether or not we should add
-            # a newline.
-            if not self.prompt_end_newline:
-                # But avoid extraneous empty lines.
-                result_repr = '\n' + result_repr
+        if '\n' in result_repr and not self.prompt_end_newline:
+            # But avoid extraneous empty lines.
+            result_repr = '\n' + result_repr
 
         try:
             print(result_repr)
@@ -198,37 +190,37 @@ class DisplayHook(Configurable):
         """Update user_ns with various things like _, __, _1, etc."""
 
         # Avoid recursive reference when displaying _oh/Out
-        if self.cache_size and result is not self.shell.user_ns['_oh']:
-            if len(self.shell.user_ns['_oh']) >= self.cache_size and self.do_full_cache:
-                self.cull_cache()
+        if not self.cache_size or result is self.shell.user_ns['_oh']:
+            return
+        if len(self.shell.user_ns['_oh']) >= self.cache_size and self.do_full_cache:
+            self.cull_cache()
 
-            # Don't overwrite '_' and friends if '_' is in __builtin__
-            # (otherwise we cause buggy behavior for things like gettext). and
-            # do not overwrite _, __ or ___ if one of these has been assigned
-            # by the user.
-            update_unders = True
-            for unders in ['_'*i for i in range(1,4)]:
-                if not unders in self.shell.user_ns:
-                    continue
-                if getattr(self, unders) is not self.shell.user_ns.get(unders):
-                    update_unders = False
+        # Don't overwrite '_' and friends if '_' is in __builtin__
+        # (otherwise we cause buggy behavior for things like gettext). and
+        # do not overwrite _, __ or ___ if one of these has been assigned
+        # by the user.
+        update_unders = True
+        for unders in ['_'*i for i in range(1,4)]:
+            if unders not in self.shell.user_ns:
+                continue
+            if getattr(self, unders) is not self.shell.user_ns.get(unders):
+                update_unders = False
 
-            self.___ = self.__
-            self.__ = self._
-            self._ = result
+        self.___ = self.__
+        self.__ = self._
+        self._ = result
 
-            if ('_' not in builtin_mod.__dict__) and (update_unders):
-                self.shell.push({'_':self._,
-                                 '__':self.__,
-                                '___':self.___}, interactive=False)
+        if ('_' not in builtin_mod.__dict__) and (update_unders):
+            self.shell.push({'_':self._,
+                             '__':self.__,
+                            '___':self.___}, interactive=False)
 
+        if self.do_full_cache:
+            new_result = f'_{self.prompt_count}'
             # hackish access to top-level  namespace to create _1,_2... dynamically
-            to_main = {}
-            if self.do_full_cache:
-                new_result = '_%s' % self.prompt_count
-                to_main[new_result] = result
-                self.shell.push(to_main, interactive=False)
-                self.shell.user_ns['_oh'][self.prompt_count] = result
+            to_main = {new_result: result}
+            self.shell.push(to_main, interactive=False)
+            self.shell.user_ns['_oh'][self.prompt_count] = result
 
     def fill_exec_result(self, result):
         if self.exec_result is not None:
@@ -289,7 +281,7 @@ class DisplayHook(Configurable):
         # delete auto-generated vars from global namespace
 
         for n in range(1,self.prompt_count + 1):
-            key = '_'+repr(n)
+            key = f'_{repr(n)}'
             try:
                 del self.shell.user_ns[key]
             except: pass

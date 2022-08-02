@@ -299,10 +299,12 @@ class ExecutionInfo(object):
 
     def __repr__(self):
         name = self.__class__.__qualname__
-        raw_cell = ((self.raw_cell[:50] + '..')
-                    if len(self.raw_cell) > 50 else self.raw_cell)
+        raw_cell = (
+            f'{self.raw_cell[:50]}..' if len(self.raw_cell) > 50 else self.raw_cell
+        )
+
         return '<%s object at %x, raw_cell="%s" store_history=%s silent=%s shell_futures=%s>' %\
-               (name, id(self), raw_cell, self.store_history, self.silent, self.shell_futures)
+                   (name, id(self), raw_cell, self.store_history, self.silent, self.shell_futures)
 
 
 class ExecutionResult(object):
@@ -718,10 +720,7 @@ class InteractiveShell(SingletonConfigurable):
         """Set the autoindent flag.
 
         If called with no arguments, it acts as a toggle."""
-        if value is None:
-            self.autoindent = not self.autoindent
-        else:
-            self.autoindent = value
+        self.autoindent = not self.autoindent if value is None else value
 
     def set_trio_runner(self, tr):
         self.trio_runner = tr
@@ -811,9 +810,9 @@ class InteractiveShell(SingletonConfigurable):
         """Initialize logging in case it was requested at the command line.
         """
         if self.logappend:
-            self.magic('logstart %s append' % self.logappend)
+            self.magic(f'logstart {self.logappend} append')
         elif self.logfile:
-            self.magic('logstart %s' % self.logfile)
+            self.magic(f'logstart {self.logfile}')
         elif self.logstart:
             self.magic('logstart')
 
@@ -921,11 +920,11 @@ class InteractiveShell(SingletonConfigurable):
         while p.is_symlink():
             p = Path(os.readlink(p))
             paths.append(p.resolve())
-        
+
         # In Cygwin paths like "c:\..." and '\cygdrive\c\...' are possible
         if p_venv.parts[1] == "cygdrive":
             drive_name = p_venv.parts[2]
-            p_venv = (drive_name + ":/") / Path(*p_venv.parts[3:])
+            p_venv = f"{drive_name}:/" / Path(*p_venv.parts[3:])
 
         if any(p_venv == p.parents[1] for p in paths):
             # Our exe is inside or has access to the virtualenv, don't need to do anything.
@@ -939,9 +938,9 @@ class InteractiveShell(SingletonConfigurable):
             )
             p_ver = sys.version_info[:2]
 
-            # Predict version from py[thon]-x.x in the $VIRTUAL_ENV
-            re_m = re.search(r"\bpy(?:thon)?([23])\.(\d+)\b", os.environ["VIRTUAL_ENV"])
-            if re_m:
+            if re_m := re.search(
+                r"\bpy(?:thon)?([23])\.(\d+)\b", os.environ["VIRTUAL_ENV"]
+            ):
                 predicted_path = Path(str(virtual_env_path).format(*re_m.groups()))
                 if predicted_path.exists():
                     p_ver = re_m.groups()
@@ -1050,11 +1049,11 @@ class InteractiveShell(SingletonConfigurable):
         dp = getattr(self.hooks, name, None)
         if name not in IPython.core.hooks.__all__:
             print("Warning! Hook '%s' is not one of %s" % \
-                  (name, IPython.core.hooks.__all__ ))
+                      (name, IPython.core.hooks.__all__ ))
 
         if _warn_deprecated and (name in IPython.core.hooks.deprecated):
             alternative = IPython.core.hooks.deprecated[name]
-            warn("Hook {} is deprecated. Use {} instead.".format(name, alternative), stacklevel=2)
+            warn(f"Hook {name} is deprecated. Use {alternative} instead.", stacklevel=2)
 
         if not dp:
             dp = IPython.core.hooks.CommandChainDispatcher()
@@ -1381,23 +1380,17 @@ class InteractiveShell(SingletonConfigurable):
 
         # For more details:
         # http://mail.python.org/pipermail/python-dev/2001-April/014068.html
-        ns = {}
+        ns = {
+            '_ih': self.history_manager.input_hist_parsed,
+            '_oh': self.history_manager.output_hist,
+            '_dh': self.history_manager.dir_hist,
+            'In': self.history_manager.input_hist_parsed,
+            'Out': self.history_manager.output_hist,
+            'get_ipython': self.get_ipython,
+            'exit': self.exiter,
+            'quit': self.exiter,
+        }
 
-        # make global variables for user access to the histories
-        ns['_ih'] = self.history_manager.input_hist_parsed
-        ns['_oh'] = self.history_manager.output_hist
-        ns['_dh'] = self.history_manager.dir_hist
-
-        # user aliases to input and output histories.  These shouldn't show up
-        # in %who, as they can have very large reprs.
-        ns['In']  = self.history_manager.input_hist_parsed
-        ns['Out'] = self.history_manager.output_hist
-
-        # Store myself as the public api!!!
-        ns['get_ipython'] = self.get_ipython
-
-        ns['exit'] = self.exiter
-        ns['quit'] = self.exiter
 
         # Sync what we've added so far to user_ns_hidden so these aren't seen
         # by %who
@@ -1497,7 +1490,7 @@ class InteractiveShell(SingletonConfigurable):
             namespace, and delete references to it.
         """
         if varname in ('__builtin__', '__builtins__'):
-            raise ValueError("Refusing to delete %s" % varname)
+            raise ValueError(f"Refusing to delete {varname}")
 
         ns_refs = self.all_ns_refs
 
@@ -1572,18 +1565,14 @@ class InteractiveShell(SingletonConfigurable):
         if isinstance(variables, dict):
             vdict = variables
         elif isinstance(variables, (str, list, tuple)):
-            if isinstance(variables, str):
-                vlist = variables.split()
-            else:
-                vlist = variables
+            vlist = variables.split() if isinstance(variables, str) else variables
             vdict = {}
             cf = sys._getframe(1)
             for name in vlist:
                 try:
                     vdict[name] = eval(name, cf.f_globals, cf.f_locals)
                 except:
-                    print('Could not get variable %s from %s' %
-                           (name,cf.f_code.co_name))
+                    print(f'Could not get variable {name} from {cf.f_code.co_name}')
         else:
             raise ValueError('variables must be a dict/str/list/tuple')
 
@@ -1629,8 +1618,8 @@ class InteractiveShell(SingletonConfigurable):
         """
         oname = oname.strip()
         if not oname.startswith(ESC_MAGIC) and \
-                not oname.startswith(ESC_MAGIC2) and \
-                not all(a.isidentifier() for a in oname.split(".")):
+                    not oname.startswith(ESC_MAGIC2) and \
+                    not all(a.isidentifier() for a in oname.split(".")):
             return {'found': False}
 
         if namespaces is None:
@@ -1786,7 +1775,7 @@ class InteractiveShell(SingletonConfigurable):
             else:
                 pmethod(info.obj, oname)
         else:
-            print('Object `%s` not found.' % oname)
+            print(f'Object `{oname}` not found.')
             return 'not found'  # so callers can take other action
 
     def object_inspect(self, oname, detail_level=0):
@@ -1995,14 +1984,9 @@ class InteractiveShell(SingletonConfigurable):
 
         raises ValueError if none of these contain any information
         """
-        if exc_tuple is None:
-            etype, value, tb = sys.exc_info()
-        else:
-            etype, value, tb = exc_tuple
-
-        if etype is None:
-            if hasattr(sys, 'last_type'):
-                etype, value, tb = sys.last_type, sys.last_value, \
+        etype, value, tb = sys.exc_info() if exc_tuple is None else exc_tuple
+        if etype is None and hasattr(sys, 'last_type'):
+            etype, value, tb = sys.last_type, sys.last_value, \
                                    sys.last_traceback
 
         if etype is None:
@@ -2024,7 +2008,7 @@ class InteractiveShell(SingletonConfigurable):
 
         These are special exceptions that shouldn't show a traceback.
         """
-        print("UsageError: %s" % exc, file=sys.stderr)
+        print(f"UsageError: {exc}", file=sys.stderr)
 
     def get_exception_only(self, exc_tuple=None):
         """
@@ -2399,14 +2383,14 @@ class InteractiveShell(SingletonConfigurable):
                 message += ' Did you mean the line magic %{0} (single %)?'.format(magic_name)
             raise UsageError(message)
         else:
-            # Note: this is the distance in the stack to the user's frame.
-            # This will need to be updated if the internal calling logic gets
-            # refactored, or else we'll be expanding the wrong variables.
-            stack_depth = 2
             if getattr(fn, magic.MAGIC_NO_VAR_EXPAND_ATTR, False):
                 # magic has opted out of var_expand
                 magic_arg_s = line
             else:
+                # Note: this is the distance in the stack to the user's frame.
+                # This will need to be updated if the internal calling logic gets
+                # refactored, or else we'll be expanding the wrong variables.
+                stack_depth = 2
                 magic_arg_s = self.var_expand(line, stack_depth)
             kwargs = {}
             if getattr(fn, "needs_local_scope", False):

@@ -551,8 +551,7 @@ class Magics(Configurable):
         # Characters that need to be escaped for latex:
         escape_re = re.compile(r'(%|_|\$|#|&)',re.MULTILINE)
         # Magic command names as headers:
-        cmd_name_re = re.compile(r'^(%s.*?):' % ESC_MAGIC,
-                                 re.MULTILINE)
+        cmd_name_re = re.compile(f'^({ESC_MAGIC}.*?):', re.MULTILINE)
         # Magic commands
         cmd_re = re.compile(r'(?P<cmd>%s.+?\b)(?!\}\}:)' % ESC_MAGIC,
                             re.MULTILINE)
@@ -608,11 +607,11 @@ class Magics(Configurable):
 
         # inject default options at the beginning of the input line
         caller = sys._getframe(1).f_code.co_name
-        arg_str = '%s %s' % (self.options_table.get(caller,''),arg_str)
+        arg_str = f"{self.options_table.get(caller, '')} {arg_str}"
 
         mode = kw.get('mode','string')
         if mode not in ['string','list']:
-            raise ValueError('incorrect mode given: %s' % mode)
+            raise ValueError(f'incorrect mode given: {mode}')
         # Get options
         list_all = kw.get('list_all',0)
         posix = kw.get('posix', os.name == 'posix')
@@ -643,35 +642,24 @@ class Magics(Configurable):
                     remainder_arg_str = remainder_arg_str.replace(o, "", 1).replace(
                         a, "", 1
                     )
-                if o.startswith("--"):
-                    o = o[2:]
-                else:
-                    o = o[1:]
+                o = o[2:] if o.startswith("--") else o[1:]
                 try:
                     odict[o].append(a)
                 except AttributeError:
                     odict[o] = [odict[o],a]
                 except KeyError:
-                    if list_all:
-                        odict[o] = [a]
-                    else:
-                        odict[o] = a
-
+                    odict[o] = [a] if list_all else a
         # Prepare opts,args for return
         opts = Struct(odict)
         if mode == 'string':
-            if preserve_non_opts:
-                args = remainder_arg_str.lstrip()
-            else:
-                args = " ".join(args)
-
+            args = remainder_arg_str.lstrip() if preserve_non_opts else " ".join(args)
         return opts,args
 
     def default_option(self, fn, optstr):
         """Make an entry in the options_table for fn, with value optstr"""
 
         if fn not in self.lsmagic():
-            error("%s is not a magic function" % fn)
+            error(f"{fn} is not a magic function")
         self.options_table[fn] = optstr
 
 
@@ -691,8 +679,8 @@ class MagicAlias(object):
         self.magic_params = magic_params
         self.magic_kind = magic_kind
 
-        self.pretty_target = '%s%s' % (magic_escapes[self.magic_kind], self.magic_name)
-        self.__doc__ = "Alias for `%s`." % self.pretty_target
+        self.pretty_target = f'{magic_escapes[self.magic_kind]}{self.magic_name}'
+        self.__doc__ = f"Alias for `{self.pretty_target}`."
 
         self._in_call = False
 
@@ -700,7 +688,7 @@ class MagicAlias(object):
         """Call the magic alias."""
         fn = self.shell.find_magic(self.magic_name, self.magic_kind)
         if fn is None:
-            raise UsageError("Magic `%s` not found." % self.pretty_target)
+            raise UsageError(f"Magic `{self.pretty_target}` not found.")
 
         # Protect against infinite recursion.
         if self._in_call:
@@ -710,7 +698,7 @@ class MagicAlias(object):
         try:
             if self.magic_params:
                 args_list = list(args)
-                args_list[0] = self.magic_params + " " + args[0]
+                args_list[0] = f"{self.magic_params} {args[0]}"
                 args = tuple(args_list)
             return fn(*args, **kwargs)
         finally:

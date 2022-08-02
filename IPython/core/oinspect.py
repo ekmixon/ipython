@@ -83,9 +83,7 @@ info_fields = ['type_name', 'base_class', 'string_form', 'namespace',
 
 def object_info(**kw):
     """Make an object info dict with all fields present."""
-    infodict = {k:None for k in info_fields}
-    infodict.update(kw)
-    return infodict
+    return {k:None for k in info_fields} | kw
 
 
 def get_encoding(obj):
@@ -128,8 +126,7 @@ def getdoc(obj) -> Union[str,None]:
     else:
         if isinstance(ds, str):
             return inspect.cleandoc(ds)
-    docstr = inspect.getdoc(obj)
-    return docstr
+    return inspect.getdoc(obj)
 
 
 def getsource(obj, oname='') -> Union[str,None]:
@@ -157,7 +154,7 @@ def getsource(obj, oname='') -> Union[str,None]:
             fn = getattr(obj, attrname)
             if fn is not None:
                 encoding = get_encoding(fn)
-                oname_prefix = ('%s.' % oname) if oname else ''
+                oname_prefix = f'{oname}.' if oname else ''
                 sources.append(''.join(('# ', oname_prefix, attrname)))
                 if inspect.isfunction(fn):
                     sources.append(dedent(getsource(fn)))
@@ -167,11 +164,7 @@ def getsource(obj, oname='') -> Union[str,None]:
                     sources.append(
                         '%s%s = %s\n' % (oname_prefix, attrname, pretty(fn))
                     )
-        if sources:
-            return '\n'.join(sources)
-        else:
-            return None
-
+        return '\n'.join(sources) if sources else None
     else:
         # Get source for non-property objects.
 
@@ -377,8 +370,7 @@ class Inspector(Colorable):
 
     def __head(self,h) -> str:
         """Return a header string with proper colors."""
-        return '%s%s%s' % (self.color_table.active_colors.header,h,
-                           self.color_table.active_colors.normal)
+        return f'{self.color_table.active_colors.header}{h}{self.color_table.active_colors.normal}'
 
     def set_active_scheme(self, scheme):
         if scheme is not None:
@@ -387,9 +379,9 @@ class Inspector(Colorable):
 
     def noinfo(self, msg, oname):
         """Generic message when no information is found."""
-        print('No %s found' % msg, end=' ')
+        print(f'No {msg} found', end=' ')
         if oname:
-            print('for %s' % oname)
+            print(f'for {oname}')
         else:
             print()
 
@@ -456,19 +448,14 @@ class Inspector(Colorable):
         if formatter:
             ds = formatter(ds).get('plain/text', ds)
         if ds:
-            lines.append(head("Class docstring:"))
-            lines.append(indent(ds))
+            lines.extend((head("Class docstring:"), indent(ds)))
         if inspect.isclass(obj) and hasattr(obj, '__init__'):
             init_ds = getdoc(obj.__init__)
             if init_ds is not None:
-                lines.append(head("Init docstring:"))
-                lines.append(indent(init_ds))
+                lines.extend((head("Init docstring:"), indent(init_ds)))
         elif hasattr(obj,'__call__'):
-            call_ds = getdoc(obj.__call__)
-            if call_ds:
-                lines.append(head("Call docstring:"))
-                lines.append(indent(call_ds))
-
+            if call_ds := getdoc(obj.__call__):
+                lines.extend((head("Call docstring:"), indent(call_ds)))
         if not lines:
             self.noinfo('documentation',oname)
         else:
@@ -528,26 +515,17 @@ class Inspector(Colorable):
         Formatters returning strings are supported but this behavior is deprecated.
 
         """
-        defaults = {
-            'text/plain': text,
-            'text/html': '<pre>' + text + '</pre>'
-        }
+        defaults = {'text/plain': text, 'text/html': f'<pre>{text}</pre>'}
 
         if formatter is None:
             return defaults
-        else:
-            formatted = formatter(text)
+        formatted = formatter(text)
 
-            if not isinstance(formatted, dict):
-                # Handle the deprecated behavior of a formatter returning
-                # a string instead of a mime bundle.
-                return {
-                    'text/plain': formatted,
-                    'text/html': '<pre>' + formatted + '</pre>'
-                }
-
-            else:
-                return dict(defaults, **formatted)
+        return (
+            dict(defaults, **formatted)
+            if isinstance(formatted, dict)
+            else {'text/plain': formatted, 'text/html': f'<pre>{formatted}</pre>'}
+        )
 
 
     def format_mime(self, bundle):
@@ -561,7 +539,7 @@ class Inspector(Colorable):
         for head, body in zip(heads, bodies):
             body = body.strip('\n')
             delim = '\n' if '\n' in body else ' '
-            text += self.__head(head+':') + (_len - len(head))*' ' +delim + body +'\n'
+            text += self.__head(f'{head}:') + (_len - len(head))*' ' + delim + body + '\n'
 
         bundle['text/plain'] = text
         return bundle
@@ -595,7 +573,13 @@ class Inspector(Colorable):
             if field is not None:
                 formatted_field = self._mime_format(field, formatter)
                 bundle['text/plain'].append((title, formatted_field['text/plain']))
-                bundle['text/html'] += '<h1>' + title + '</h1>\n' + formatted_field['text/html'] + '\n'
+                bundle['text/html'] += (
+                    f'<h1>{title}'
+                    + '</h1>\n'
+                    + formatted_field['text/html']
+                    + '\n'
+                )
+
 
         def code_formatter(text):
             return {
@@ -729,9 +713,9 @@ class Inspector(Colorable):
                 try:
                     ds = "Alias to the system command:\n  %s" % obj[1]
                 except:
-                    ds = "Alias: " + str(obj)
+                    ds = f"Alias: {str(obj)}"
             else:
-                ds = "Alias to " + str(obj)
+                ds = f"Alias to {str(obj)}"
                 if obj.__doc__:
                     ds += "\nDocstring:\n" + obj.__doc__
         else:
@@ -741,9 +725,6 @@ class Inspector(Colorable):
 
         # store output in a dict, we initialize it here and fill it as we go
         out = dict(name=oname, found=True, isalias=isalias, ismagic=ismagic, subclasses=None)
-
-        string_max = 200 # max size of strings to show (snipped if longer)
-        shalf = int((string_max - 5) / 2)
 
         if ismagic:
             out['type_name'] = 'Magic function'
@@ -760,13 +741,16 @@ class Inspector(Colorable):
 
         # String form, but snip if too long in ? form (full in ??)
         if detail_level >= self.str_detail_level:
+            string_max = 200 # max size of strings to show (snipped if longer)
+            shalf = int((string_max - 5) / 2)
+
             try:
                 ostr = str(obj)
                 str_head = 'string_form'
                 if not detail_level and len(ostr)>string_max:
-                    ostr = ostr[:shalf] + ' <...> ' + ostr[-shalf:]
+                    ostr = f'{ostr[:shalf]} <...> {ostr[-shalf:]}'
                     ostr = ("\n" + " " * len(str_head.expandtabs())).\
-                            join(q.strip() for q in ostr.split("\n"))
+                                join(q.strip() for q in ostr.split("\n"))
                 out[str_head] = ostr
             except:
                 pass
@@ -853,11 +837,8 @@ class Inspector(Colorable):
             else:
                 all_names = ', '.join(names[:10]+['...'])
             out['subclasses'] = all_names
-        # and class docstring for instances:
         else:
-            # reconstruct the function definition and print it:
-            defln = self._getdef(obj, oname)
-            if defln:
+            if defln := self._getdef(obj, oname):
                 out['definition'] = defln
 
             # First, check whether the instance docstring is identical to the
@@ -964,14 +945,12 @@ class Inspector(Colorable):
             # Both filter and type specified
             filter,type_pattern = cmds
         else:
-            raise ValueError('invalid argument string for psearch: <%s>' %
-                             pattern)
+            raise ValueError(f'invalid argument string for psearch: <{pattern}>')
 
         # filter search namespaces
         for name in ns_search:
             if name not in ns_table:
-                raise ValueError('invalid namespace <%s>. Valid names: %s' %
-                                 (name,ns_table.keys()))
+                raise ValueError(f'invalid namespace <{name}>. Valid names: {ns_table.keys()}')
 
         #print 'type_pattern:',type_pattern # dbg
         search_result, namespaces_seen = set(), set()
@@ -1018,14 +997,12 @@ def _render_signature(obj_signature, obj_name) -> str:
     # add up name, parameters, braces (2), and commas
     if len(obj_name) + sum(len(r) + 2 for r in result) > 75:
         # This doesn’t fit behind “Signature: ” in an inspect window.
-        rendered = '{}(\n{})'.format(obj_name, ''.join(
-            '    {},\n'.format(r) for r in result)
-        )
+        rendered = '{}(\n{})'.format(obj_name, ''.join(f'    {r},\n' for r in result))
     else:
-        rendered = '{}({})'.format(obj_name, ', '.join(result))
+        rendered = f"{obj_name}({', '.join(result)})"
 
     if obj_signature.return_annotation is not inspect._empty:
         anno = inspect.formatannotation(obj_signature.return_annotation)
-        rendered += ' -> {}'.format(anno)
+        rendered += f' -> {anno}'
 
     return rendered

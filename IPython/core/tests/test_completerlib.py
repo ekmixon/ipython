@@ -75,7 +75,7 @@ class Test_magic_run_completer(unittest.TestCase):
 
     def test_completion_in_dir(self):
         # Github issue #3459
-        event = MockEvent(u'%run a.py {}'.format(join(self.BASETESTDIR, 'a')))
+        event = MockEvent(f"%run a.py {join(self.BASETESTDIR, 'a')}")
         print(repr(event.line))
         match = set(magic_run_completer(None, event))
         # We specifically use replace here rather than normpath, because
@@ -133,12 +133,12 @@ def test_import_invalid_module():
     with TemporaryDirectory() as tmpdir:
         sys.path.insert( 0, tmpdir )
         for name in invalid_module_names | valid_module_names:
-            filename = os.path.join(tmpdir, name + '.py')
+            filename = os.path.join(tmpdir, f'{name}.py')
             open(filename, 'w').close()
 
         s = set( module_completion('import foo') )
         intersection = s.intersection(invalid_module_names)
-        assert intersection == set()
+        assert not intersection
 
         assert valid_module_names.issubset(s), valid_module_names.intersection(s)
 

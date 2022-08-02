@@ -94,7 +94,7 @@ class PylabMagics(Magics):
         args = magic_arguments.parse_argstring(self.matplotlib, line)
         if args.list:
             backends_list = list(backends.keys())
-            print("Available matplotlib backends: %s" % backends_list)
+            print(f"Available matplotlib backends: {backends_list}")
         else:
             gui, backend = self.shell.enable_matplotlib(args.gui.lower() if isinstance(args.gui, str) else args.gui)
             self._show_matplotlib_backend(args.gui, backend)
@@ -159,11 +159,14 @@ class PylabMagics(Magics):
         )
         print("Populating the interactive namespace from numpy and matplotlib")
         if clobbered:
-            warn("pylab import has clobbered these variables: %s"  % clobbered +
-            "\n`%matplotlib` prevents importing * from pylab and numpy"
+            warn(
+                (
+                    f"pylab import has clobbered these variables: {clobbered}"
+                    + "\n`%matplotlib` prevents importing * from pylab and numpy"
+                )
             )
 
     def _show_matplotlib_backend(self, gui, backend):
         """show matplotlib message backend message"""
         if not gui or gui == 'auto':
-            print("Using matplotlib backend: %s" % backend)
+            print(f"Using matplotlib backend: {backend}")

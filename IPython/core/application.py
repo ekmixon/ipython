@@ -9,6 +9,7 @@ The job of an :class:`Application` is to create the master configuration
 object and then create the configurable objects, passing the config to them.
 """
 
+
 # Copyright (c) IPython Development Team.
 # Distributed under the terms of the Modified BSD License.
 
@@ -34,10 +35,9 @@ from traitlets import (
 )
 
 if os.name == "nt":
-    programdata = Path(os.environ.get("PROGRAMDATA", None))
-    if programdata:
+    if programdata := Path(os.environ.get("PROGRAMDATA", None)):
         SYSTEM_CONFIG_DIRS = [str(programdata / "ipython")]
-    else:  # PROGRAMDATA is not defined by default on XP.
+    else:
         SYSTEM_CONFIG_DIRS = []
 else:
     SYSTEM_CONFIG_DIRS = [
@@ -56,20 +56,19 @@ if _env_config_dir not in SYSTEM_CONFIG_DIRS:
 _envvar = os.environ.get('IPYTHON_SUPPRESS_CONFIG_ERRORS')
 if _envvar in {None, ''}:
     IPYTHON_SUPPRESS_CONFIG_ERRORS = None
+elif _envvar.lower() in {'1','true'}:
+    IPYTHON_SUPPRESS_CONFIG_ERRORS = True
+elif _envvar.lower() in {'0','false'} :
+    IPYTHON_SUPPRESS_CONFIG_ERRORS = False
 else:
-    if _envvar.lower() in {'1','true'}:
-        IPYTHON_SUPPRESS_CONFIG_ERRORS = True
-    elif _envvar.lower() in {'0','false'} :
-        IPYTHON_SUPPRESS_CONFIG_ERRORS = False
-    else:
-        sys.exit("Unsupported value for environment variable: 'IPYTHON_SUPPRESS_CONFIG_ERRORS' is set to '%s' which is none of  {'0', '1', 'false', 'true', ''}."% _envvar )
+    sys.exit("Unsupported value for environment variable: 'IPYTHON_SUPPRESS_CONFIG_ERRORS' is set to '%s' which is none of  {'0', '1', 'false', 'true', ''}."% _envvar )
 
 # aliases and flags
 
 base_aliases = {}
 if isinstance(Application.aliases, dict):
     # traitlets 5
-    base_aliases.update(Application.aliases)
+    base_aliases |= Application.aliases
 base_aliases.update(
     {
         "profile-dir": "ProfileDir.location",
@@ -80,10 +79,10 @@ base_aliases.update(
     }
 )
 
-base_flags = dict()
+base_flags = {}
 if isinstance(Application.flags, dict):
     # traitlets 5
-    base_flags.update(Application.flags)
+    base_flags |= Application.flags
 base_flags.update(
     dict(
         debug=(
@@ -280,7 +279,7 @@ class BaseIPythonApplication(Application):
         set self.verbose_crash=True to use our full crashhandler, instead of
         a regular traceback with a short message (crash_handler_lite)
         """
-        
+
         if self.verbose_crash:
             return self.crash_handler(etype, evalue, tb)
         else:
@@ -308,7 +307,7 @@ class BaseIPythonApplication(Application):
             except OSError as e:
                 # this will not be EEXIST
                 self.log.error("couldn't create path %s: %s", path, e)
-        self.log.debug("IPYTHONDIR set to: %s" % new)
+        self.log.debug(f"IPYTHONDIR set to: {new}")
 
     def load_config_file(self, suppress_errors=IPYTHON_SUPPRESS_CONFIG_ERRORS):
         """Load the config file.
@@ -331,8 +330,7 @@ class BaseIPythonApplication(Application):
 
         self.log.debug("Searching path %s for config files", self.config_file_paths)
         base_config = 'ipython_config.py'
-        self.log.debug("Attempting to load config file: %s" %
-                       base_config)
+        self.log.debug(f"Attempting to load config file: {base_config}")
         try:
             if suppress_errors is not None:
                 old_value = Application.raise_config_file_errors
@@ -345,15 +343,13 @@ class BaseIPythonApplication(Application):
         except ConfigFileNotFound:
             # ignore errors loading parent
             self.log.debug("Config file %s not found", base_config)
-            pass
         if suppress_errors is not None:
             Application.raise_config_file_errors = old_value
-        
+
         for config_file_name in self.config_files:
             if not config_file_name or config_file_name == base_config:
                 continue
-            self.log.debug("Attempting to load config file: %s" %
-                           self.config_file_name)
+            self.log.debug(f"Attempting to load config file: {self.config_file_name}")
             try:
                 Application.load_config_file(
                     self,
@@ -371,8 +367,10 @@ class BaseIPythonApplication(Application):
                 # For testing purposes.
                 if not suppress_errors:
                     raise
-                self.log.warning("Error loading config file: %s" %
-                              self.config_file_name, exc_info=True)
+                self.log.warning(
+                    f"Error loading config file: {self.config_file_name}",
+                    exc_info=True,
+                )
 
     def init_profile_dir(self):
         """initialize the profile dir"""

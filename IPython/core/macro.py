@@ -25,8 +25,7 @@ class Macro(object):
         lines = []
         enc = None
         for line in code.splitlines():
-            coding_match = coding_declaration.match(line)
-            if coding_match:
+            if coding_match := coding_declaration.match(line):
                 enc = coding_match.group(1)
             else:
                 lines.append(line)
@@ -39,7 +38,7 @@ class Macro(object):
         return self.value
 
     def __repr__(self):
-        return 'IPython.macro.Macro(%s)' % repr(self.value)
+        return f'IPython.macro.Macro({repr(self.value)})'
     
     def __getstate__(self):
         """ needed for safe pickling via %store """
